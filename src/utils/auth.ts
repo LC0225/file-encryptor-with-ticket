@@ -1,3 +1,6 @@
+import { canUseDatabase } from './config';
+import * as authLocalStorage from './authLocalStorage';
+
 export interface User {
   id: string;
   username: string;
@@ -6,46 +9,32 @@ export interface User {
   role: 'admin' | 'user';
 }
 
-export interface Session {
-  userId: string;
-  username: string;
-  role: string;
-  loginTime: string;
-}
-
 const TOKEN_KEY = 'crypto_auth_token';
 
 /**
  * 密码要求检查
  */
 export function validatePassword(password: string): { valid: boolean; message: string } {
-  if (password.length < 8) {
-    return { valid: false, message: '密码长度至少8位' };
-  }
-  if (!/[A-Z]/.test(password)) {
-    return { valid: false, message: '密码必须包含大写字母' };
-  }
-  if (!/[a-z]/.test(password)) {
-    return { valid: false, message: '密码必须包含小写字母' };
-  }
-  if (!/[0-9]/.test(password)) {
-    return { valid: false, message: '密码必须包含数字' };
-  }
-  return { valid: true, message: '密码符合要求' };
+  return authLocalStorage.validatePassword(password);
 }
 
 /**
  * 初始化管理员账号
  */
 export async function initAdminUser(): Promise<void> {
-  try {
-    const response = await fetch('/api/auth/init-admin', {
-      method: 'POST',
-    });
-    const data = await response.json();
-    console.log(data.message);
-  } catch (error) {
-    console.error('初始化管理员账号失败:', error);
+  if (canUseDatabase()) {
+    try {
+      const response = await fetch('/api/auth/init-admin', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      console.log(data.message);
+    } catch (error) {
+      console.error('初始化管理员账号失败:', error);
+      // 如果数据库失败，回退到localStorage
+    }
+  } else {
+    await authLocalStorage.initAdminUser();
   }
 }
 
@@ -57,20 +46,26 @@ export async function registerUser(
   password: string,
   email?: string
 ): Promise<{ success: boolean; message: string }> {
-  try {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password, email }),
-    });
+  if (canUseDatabase()) {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password, email }),
+      });
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return { success: false, message: '注册失败，请重试' };
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('注册失败（数据库），回退到localStorage:', error);
+      // 如果数据库失败，回退到localStorage
+    }
   }
+  
+  // 使用localStorage方案
+  return authLocalStorage.registerUser(username, password, email);
 }
 
 /**
@@ -80,27 +75,33 @@ export async function loginUser(
   username: string,
   password: string
 ): Promise<{ success: boolean; message: string; user?: User }> {
-  try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
+  if (canUseDatabase()) {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.success && data.token) {
-      // 保存token到localStorage
-      localStorage.setItem(TOKEN_KEY, data.token);
-      return { success: true, message: data.message, user: data.user };
+      if (data.success && data.token) {
+        // 保存token到localStorage
+        localStorage.setItem(TOKEN_KEY, data.token);
+        return { success: true, message: data.message, user: data.user };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('登录失败（数据库），回退到localStorage:', error);
+      // 如果数据库失败，回退到localStorage
     }
-
-    return data;
-  } catch (error) {
-    return { success: false, message: '登录失败，请重试' };
   }
+  
+  // 使用localStorage方案
+  return authLocalStorage.loginUser(username, password);
 }
 
 /**
@@ -108,7 +109,12 @@ export async function loginUser(
  */
 export function logoutUser(): void {
   if (typeof window === 'undefined') return;
+  
+  // 清除token
   localStorage.removeItem(TOKEN_KEY);
+  
+  // 清除localStorage中的会话
+  authLocalStorage.logoutUser();
 }
 
 /**
@@ -117,32 +123,37 @@ export function logoutUser(): void {
 export async function getCurrentUser(): Promise<User | null> {
   if (typeof window === 'undefined') return null;
 
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return null;
+  if (canUseDatabase()) {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return null;
 
-    const response = await fetch('/api/auth/user', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+      const response = await fetch('/api/auth/user', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-    if (response.status === 401) {
-      // Token无效，清除本地存储
-      localStorage.removeItem(TOKEN_KEY);
+      if (response.status === 401) {
+        // Token无效，清除本地存储
+        localStorage.removeItem(TOKEN_KEY);
+        return null;
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        return data.user;
+      }
+
       return null;
+    } catch (error) {
+      console.error('获取当前用户失败（数据库），回退到localStorage:', error);
+      // 如果数据库失败，回退到localStorage
     }
-
-    const data = await response.json();
-    if (data.success) {
-      return data.user;
-    }
-
-    return null;
-  } catch (error) {
-    console.error('获取当前用户失败:', error);
-    return null;
   }
+  
+  // 使用localStorage方案
+  return authLocalStorage.getCurrentUser();
 }
 
 /**
@@ -150,15 +161,22 @@ export async function getCurrentUser(): Promise<User | null> {
  */
 export function isAdmin(): boolean {
   if (typeof window === 'undefined') return false;
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return false;
-
-    const sessionData = JSON.parse(atob(token));
-    return sessionData.role === 'admin';
-  } catch (error) {
-    return false;
+  
+  // 先检查token中的角色（如果是数据库方案）
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    try {
+      const sessionData = JSON.parse(atob(token));
+      if (sessionData.role === 'admin') {
+        return true;
+      }
+    } catch (error) {
+      // 解析失败，继续使用localStorage检查
+    }
   }
+  
+  // 使用localStorage检查
+  return authLocalStorage.isAdmin();
 }
 
 /**
@@ -166,7 +184,9 @@ export function isAdmin(): boolean {
  */
 export function isLoggedIn(): boolean {
   if (typeof window === 'undefined') return false;
-  return !!localStorage.getItem(TOKEN_KEY);
+  
+  // 检查token或localStorage会话
+  return !!localStorage.getItem(TOKEN_KEY) || authLocalStorage.isLoggedIn();
 }
 
 /**
@@ -181,52 +201,63 @@ export function getAuthToken(): string | null {
  * 获取所有用户（仅管理员）
  */
 export async function getAllUsers(): Promise<User[]> {
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return [];
+  if (canUseDatabase()) {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return [];
 
-    const response = await fetch('/api/admin/users', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-    if (response.status === 401 || response.status === 403) {
+      if (response.status === 401 || response.status === 403) {
+        return [];
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        return data.users;
+      }
+
       return [];
+    } catch (error) {
+      console.error('获取用户列表失败（数据库），回退到localStorage:', error);
+      // 如果数据库失败，回退到localStorage
     }
-
-    const data = await response.json();
-    if (data.success) {
-      return data.users;
-    }
-
-    return [];
-  } catch (error) {
-    console.error('获取用户列表失败:', error);
-    return [];
   }
+  
+  // 使用localStorage方案
+  return authLocalStorage.getAllUsers();
 }
 
 /**
  * 删除用户（仅管理员）
  */
 export async function deleteUser(userId: string): Promise<{ success: boolean; message: string }> {
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      return { success: false, message: '未登录' };
+  if (canUseDatabase()) {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        return { success: false, message: '未登录' };
+      }
+
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('删除用户失败（数据库），回退到localStorage:', error);
+      // 如果数据库失败，回退到localStorage
     }
-
-    const response = await fetch(`/api/admin/users/${userId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return { success: false, message: '删除用户失败' };
   }
+  
+  // 使用localStorage方案
+  return authLocalStorage.deleteUser(userId);
 }
