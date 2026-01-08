@@ -75,11 +75,11 @@ export default function Admin() {
         const data = await response.json();
         setUsers(data.users);
       } else {
-        showToast({ type: 'error', message: '获取用户列表失败', duration: 3000 });
+        showToast('获取用户列表失败', 'error');
       }
     } catch (error) {
       console.error('获取用户列表失败:', error);
-      showToast({ type: 'error', message: '获取用户列表失败', duration: 3000 });
+      showToast('获取用户列表失败', 'error');
     } finally {
       setLoading(false);
     }
@@ -100,16 +100,16 @@ export default function Admin() {
       const data = await response.json();
 
       if (data.success) {
-        showToast({ type: 'success', message: data.message, duration: 2000 });
+        showToast(data.message, 'success');
         setShowAddUserModal(false);
         setAddUserForm({ username: '', password: '', email: '', role: 'user' });
         loadUsers();
       } else {
-        showToast({ type: 'error', message: data.message, duration: 3000 });
+        showToast(data.message, 'error');
       }
     } catch (error) {
       console.error('添加用户失败:', error);
-      showToast({ type: 'error', message: '添加用户失败', duration: 3000 });
+      showToast('添加用户失败', 'error');
     }
   };
 
@@ -128,15 +128,15 @@ export default function Admin() {
       const data = await response.json();
 
       if (data.success) {
-        showToast({ type: 'success', message: data.message, duration: 2000 });
+        showToast(data.message, 'success');
         setShowPasswordModal(false);
         setPasswordForm({ userId: '', username: '', newPassword: '' });
       } else {
-        showToast({ type: 'error', message: data.message, duration: 3000 });
+        showToast(data.message, 'error');
       }
     } catch (error) {
       console.error('修改密码失败:', error);
-      showToast({ type: 'error', message: '修改密码失败', duration: 3000 });
+      showToast('修改密码失败', 'error');
     }
   };
 
@@ -158,14 +158,14 @@ export default function Admin() {
       const data = await response.json();
 
       if (data.success) {
-        showToast({ type: 'success', message: data.message, duration: 2000 });
+        showToast(data.message, 'success');
         loadUsers();
       } else {
-        showToast({ type: 'error', message: data.message, duration: 3000 });
+        showToast(data.message, 'error');
       }
     } catch (error) {
       console.error('删除用户失败:', error);
-      showToast({ type: 'error', message: '删除用户失败', duration: 3000 });
+      showToast('删除用户失败', 'error');
     } finally {
       setShowDeleteModal(false);
       setSelectedUser(null);
