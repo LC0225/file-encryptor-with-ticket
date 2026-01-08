@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userManager } from '@/storage/database/userManager';
+import { canUseDatabase } from '@/utils/config';
 import { Buffer } from 'buffer';
 
 // 静态导出配置
@@ -20,6 +21,17 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 
 export async function POST(request: NextRequest) {
   try {
+    // 检查是否可以使用数据库
+    if (!canUseDatabase()) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: '数据库未配置。请设置 USE_DATABASE=true 和 DATABASE_URL 环境变量，或使用浏览器本地存储模式。',
+        },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { username, password } = body;
 

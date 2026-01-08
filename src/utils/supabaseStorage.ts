@@ -11,10 +11,16 @@ const FILE_PATH = 'app-data.json';
 export async function uploadAppData(data: any): Promise<boolean> {
   try {
     if (!isSupabaseConfigured()) {
-      throw new Error('Supabase 未配置');
+      console.warn('Supabase 未配置，跳过上传');
+      return false;
     }
 
     const supabase = getSupabaseClient();
+    if (!supabase) {
+      console.warn('Supabase 客户端未初始化，跳过上传');
+      return false;
+    }
+
     const jsonContent = JSON.stringify(data, null, 2);
 
     // 上传文件到 Supabase Storage
@@ -44,10 +50,15 @@ export async function uploadAppData(data: any): Promise<boolean> {
 export async function downloadAppData(): Promise<any | null> {
   try {
     if (!isSupabaseConfigured()) {
-      throw new Error('Supabase 未配置');
+      console.warn('Supabase 未配置，跳过下载');
+      return null;
     }
 
     const supabase = getSupabaseClient();
+    if (!supabase) {
+      console.warn('Supabase 客户端未初始化，跳过下载');
+      return null;
+    }
 
     // 检查文件是否存在
     const { data: existsData } = await supabase.storage
@@ -99,6 +110,9 @@ export async function checkCloudDataExists(): Promise<boolean> {
     }
 
     const supabase = getSupabaseClient();
+    if (!supabase) {
+      return false;
+    }
 
     const { data } = await supabase.storage
       .from(BUCKET_NAME)

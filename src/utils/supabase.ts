@@ -25,7 +25,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
  */
 export function getSupabaseClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase 未配置：请在 .env.local 中设置环境变量');
+    console.warn('Supabase 未配置，云端同步功能将不可用');
+    return null;
   }
 
   return createClient(supabaseUrl, supabaseAnonKey, {
