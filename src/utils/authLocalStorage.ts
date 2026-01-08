@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import { syncToCloud, syncFromCloud } from './dataSync';
 
 export interface User {
   id: string;
@@ -127,6 +128,9 @@ export async function registerUser(
   users.push(newUser);
   saveUsers(users);
 
+  // 触发云同步
+  syncToCloud().catch(error => console.error('注册后云同步失败:', error));
+
   return { success: true, message: '注册成功' };
 }
 
@@ -137,6 +141,14 @@ export async function loginUser(
   username: string,
   password: string
 ): Promise<{ success: boolean; message: string; user?: any }> {
+  // 先同步云端数据
+  try {
+    await syncFromCloud();
+  } catch (error) {
+    console.error('登录前云同步失败:', error);
+    // 同步失败不影响登录，继续使用本地数据
+  }
+
   const users = getUsers();
   const user = users.find((u) => u.username === username);
 
@@ -245,6 +257,9 @@ export function deleteUser(userId: string): { success: boolean; message: string 
 
   const updatedUsers = users.filter(u => u.id !== userId);
   saveUsers(updatedUsers);
+
+  // 触发云同步
+  syncToCloud().catch(error => console.error('删除用户后云同步失败:', error));
 
   return { success: true, message: '用户删除成功' };
 }

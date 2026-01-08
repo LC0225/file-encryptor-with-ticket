@@ -11,6 +11,13 @@ import {
   formatDate,
 } from '@/utils/storage';
 import { getCurrentUser, logoutUser, isLoggedIn } from '@/utils/auth';
+import {
+  getSyncStatus,
+  fullSync,
+  initSyncStatus,
+  formatSyncTime,
+  type SyncStatus as SyncStatusType,
+} from '@/utils/dataSync';
 
 export default function Profile() {
   const router = useRouter();
@@ -18,6 +25,14 @@ export default function Profile() {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatusType>({
+    enabled: true,
+    lastSyncTime: null,
+    syncing: false,
+    cloudExists: false,
+  });
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncMessageType, setSyncMessageType] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
     // 登录检查
@@ -34,6 +49,13 @@ export default function Profile() {
     loadUser();
 
     loadHistory();
+
+    // 初始化同步状态
+    const initSync = async () => {
+      await initSyncStatus();
+      setSyncStatus(getSyncStatus());
+    };
+    initSync();
   }, [router]);
 
   const loadHistory = () => {
@@ -119,6 +141,38 @@ export default function Profile() {
         handleDownloadEncryptedFile(item);
       }, index * 500);
     });
+  };
+
+  const handleManualSync = async () => {
+    setSyncMessage(null);
+    setSyncMessageType(null);
+
+    try {
+      const result = await fullSync();
+
+      // 更新同步状态
+      setSyncStatus(getSyncStatus());
+
+      if (result.success) {
+        setSyncMessage(result.message);
+        setSyncMessageType('success');
+        // 重新加载历史记录
+        loadHistory();
+      } else {
+        setSyncMessage(result.message);
+        setSyncMessageType('error');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '同步失败，请稍后重试';
+      setSyncMessage(message);
+      setSyncMessageType('error');
+    }
+
+    // 5秒后自动隐藏消息
+    setTimeout(() => {
+      setSyncMessage(null);
+      setSyncMessageType(null);
+    }, 5000);
   };
 
   return (
@@ -230,6 +284,92 @@ export default function Profile() {
                   : '-'}
               </div>
             </div>
+          </div>
+
+          {/* 云同步状态 */}
+          <div className="rounded-xl bg-white p-6 shadow dark:bg-gray-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                云端同步
+              </h3>
+              <button
+                onClick={handleManualSync}
+                disabled={syncStatus.syncing}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-blue-700"
+              >
+                {syncStatus.syncing ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    同步中...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    立即同步
+                  </>
+                )}
+              </button>
+            </div>
+
+            {syncMessage && (
+              <div
+                className={`mb-4 rounded-lg p-4 text-sm ${
+                  syncMessageType === 'success'
+                    ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+                    : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+                }`}
+              >
+                {syncMessage}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  云端数据状态
+                </span>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`h-2 w-2 rounded-full ${
+                      syncStatus.cloudExists
+                        ? 'bg-green-500'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  />
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {syncStatus.cloudExists ? '已存在' : '暂无数据'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  最后同步时间
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatSyncTime(syncStatus.lastSyncTime)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  同步功能
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {syncStatus.enabled ? '已启用' : '已禁用'}
+                </span>
+              </div>
+            </div>
+
+            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+              云端同步功能会将您的加密历史和用户数据备份到云端，支持多设备访问。
+              数据加密存储，仅您本人可访问。
+            </p>
           </div>
 
           {/* 历史记录列表 */}

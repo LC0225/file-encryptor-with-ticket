@@ -1,4 +1,5 @@
 import { EncryptionResult } from './crypto';
+import { syncToCloud } from './dataSync';
 
 export interface EncryptionHistory extends EncryptionResult {
   id: string;
@@ -33,7 +34,7 @@ export function addEncryptionHistory(
   fileSize: number
 ): void {
   if (typeof window === 'undefined') return;
-  
+
   try {
     const history = getEncryptionHistory();
     const newRecord: EncryptionHistory = {
@@ -45,6 +46,9 @@ export function addEncryptionHistory(
     };
     history.unshift(newRecord);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+
+    // 触发云同步
+    syncToCloud().catch(error => console.error('添加加密历史后云同步失败:', error));
   } catch (error) {
     console.error('保存加密历史失败:', error);
   }
@@ -55,11 +59,14 @@ export function addEncryptionHistory(
  */
 export function deleteEncryptionHistory(id: string): void {
   if (typeof window === 'undefined') return;
-  
+
   try {
     const history = getEncryptionHistory();
     const filtered = history.filter((item) => item.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+
+    // 触发云同步
+    syncToCloud().catch(error => console.error('删除加密历史后云同步失败:', error));
   } catch (error) {
     console.error('删除加密历史失败:', error);
   }
@@ -70,9 +77,12 @@ export function deleteEncryptionHistory(id: string): void {
  */
 export function clearEncryptionHistory(): void {
   if (typeof window === 'undefined') return;
-  
+
   try {
     localStorage.removeItem(STORAGE_KEY);
+
+    // 触发云同步
+    syncToCloud().catch(error => console.error('清空加密历史后云同步失败:', error));
   } catch (error) {
     console.error('清空加密历史失败:', error);
   }
