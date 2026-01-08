@@ -175,7 +175,9 @@ export async function loginUser(
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 
-  return { success: true, message: '登录成功', user };
+  // 返回完整的用户对象（排除密码哈希）
+  const { passwordHash, ...userWithoutPassword } = user;
+  return { success: true, message: '登录成功', user: userWithoutPassword };
 }
 
 /**
@@ -198,9 +200,20 @@ export function getCurrentUser(): any | null {
     const session = JSON.parse(sessionData);
     const users = getUsers();
     const user = users.find((u) => u.id === session.userId);
-    return user || null;
+
+    if (!user) {
+      // Session中记录的用户不存在，清除session
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+
+    // 返回用户对象（排除密码哈希）
+    const { passwordHash, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   } catch (error) {
     console.error('获取当前用户失败:', error);
+    // 如果解析失败，清除可能损坏的数据
+    localStorage.removeItem(SESSION_KEY);
     return null;
   }
 }

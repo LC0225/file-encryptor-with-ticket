@@ -26,12 +26,23 @@ export async function initAdminUser(): Promise<void> {
     try {
       const response = await fetch('/api/auth/init-admin', {
         method: 'POST',
+        // 设置超时，避免长时间阻塞
+        signal: AbortSignal.timeout(5000),
       });
+
+      if (!response.ok) {
+        // 如果 API 返回错误（比如 503），回退到 localStorage
+        console.warn(`初始化管理员账号失败: ${response.status} ${response.statusText}`);
+        await authLocalStorage.initAdminUser();
+        return;
+      }
+
       const data = await response.json();
       console.log(data.message);
     } catch (error) {
       console.error('初始化管理员账号失败:', error);
       // 如果数据库失败，回退到localStorage
+      await authLocalStorage.initAdminUser();
     }
   } else {
     await authLocalStorage.initAdminUser();
