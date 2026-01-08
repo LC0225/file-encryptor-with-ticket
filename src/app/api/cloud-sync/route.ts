@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadAppData, downloadAppData, checkCloudDataExists } from '@/utils/s3Storage';
+import { uploadAppData, downloadAppData, checkCloudDataExists } from '@/utils/supabaseStorage';
 import type { AppData, SyncResult } from '@/types';
 
 /**

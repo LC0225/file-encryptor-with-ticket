@@ -2,7 +2,84 @@
 
 ## 5分钟快速配置指南
 
-### 方案A：使用阿里云OSS（推荐）
+### 方案A：使用 Supabase Storage（强烈推荐）
+
+Supabase 是一个开源的 Firebase 替代品，提供免费存储和简单的配置。
+
+1. **注册 Supabase**
+   - 访问 https://supabase.com
+   - 使用 GitHub 或邮箱注册
+
+2. **创建项目**
+   - 点击 "Start your project"
+   - 填写项目名称（例如：`file-encrypt`）
+   - 设置数据库密码
+   - 选择离你最近的区域
+   - 点击 "Create new project"，等待创建完成（约2分钟）
+
+3. **创建 Storage Bucket**
+   - 进入项目控制台
+   - 点击左侧菜单的 **Storage**
+   - 点击 "New bucket"
+   - 填写 Bucket 名称：`file-encrypt`（必须与此名称一致）
+   - 取消勾选 "Public bucket"
+   - 点击 "Create bucket"
+
+4. **配置访问策略**
+   - 点击刚创建的 `file-encrypt` bucket
+   - 点击 "Policies" 标签页
+   - 添加以下策略（允许上传、下载、更新、列表）：
+     ```sql
+     allow upload on storage.objects for insert
+     with check ( bucket_id = 'file-encrypt' )
+
+     allow download on storage.objects for select
+     using ( bucket_id = 'file-encrypt' )
+     ```
+
+5. **获取配置信息**
+   - 点击左侧菜单的 **Settings** → **API**
+   - 复制 **Project URL** 和 **anon public** key
+
+6. **配置环境变量**
+
+   在项目根目录创建 `.env.local` 文件：
+
+   ```bash
+   # 复制示例文件
+   cp .env.local.example .env.local
+   ```
+
+   编辑 `.env.local` 文件：
+
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   ```
+
+7. **重启开发服务器**
+
+   ```bash
+   npm run dev
+   ```
+
+8. **测试功能**
+
+   - 登录应用
+   - 进入个人中心
+   - 点击"立即同步"按钮
+
+**优势**：
+- ✅ 完全免费（500MB存储 + 2GB带宽）
+- ✅ 配置简单，无需复杂的权限设置
+- ✅ 开源透明，可自托管
+- ✅ 与 Next.js 完美集成
+
+**详细配置指南**：请查看 [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
+
+---
+
+### 方案B：使用阿里云OSS
 
 1. **注册阿里云**
    - 访问 https://www.aliyun.com/product/oss
@@ -50,7 +127,7 @@
 
 ---
 
-### 方案B：使用腾讯云COS（推荐）
+### 方案C：使用腾讯云COS
 
 1. **注册腾讯云**
    - 访问 https://cloud.tencent.com/product/cos
@@ -98,7 +175,7 @@
 
 ---
 
-### 方案C：不配置云存储（本地存储）
+### 方案D：不配置云存储（本地存储）
 
 如果你不需要多设备同步功能：
 
@@ -118,7 +195,12 @@
 
 ### Q1: 我可以使用免费存储吗？
 
-**A: 可以！** 阿里云OSS和腾讯云COS都提供免费额度：
+**A: 可以！** 所有推荐方案都提供免费额度：
+
+- **Supabase Storage**：
+  - 永久免费（500MB存储 + 2GB带宽）
+  - 配置最简单，强烈推荐
+  - 开源透明
 
 - **阿里云OSS**：
   - 前3个月免费（5GB存储 + 5GB流量）
@@ -183,6 +265,17 @@
 ---
 
 ## 费用参考
+
+### Supabase Storage（2024年价格）
+
+- **存储费用**：免费 500MB
+- **带宽费用**：免费 2GB/月
+- **API请求**：免费 50,000次/月
+- **超额费用**：$0.021/GB/月（存储），$0.06/GB（带宽）
+
+**估算成本**（个人使用）：
+- 10个加密文件（共100MB）：完全免费
+- 年成本：$0
 
 ### 阿里云OSS（2024年价格）
 
