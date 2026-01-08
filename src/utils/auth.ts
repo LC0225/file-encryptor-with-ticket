@@ -198,14 +198,18 @@ export function getAuthToken(): string | null {
 }
 
 /**
- * 从token获取用户信息（服务器端使用）
+ * 从token中解析用户信息（服务器端使用）
+ * @param token - 认证token
+ * @returns 用户信息或null
  */
-export async function getCurrentUserFromToken(token: string): Promise<User | null> {
+export function getCurrentUserFromToken(token: string): User | null {
   try {
-    const sessionData = JSON.parse(Buffer.from(token, 'base64').toString());
+    // 解析base64编码的token
+    const sessionData = JSON.parse(atob(token));
     return {
-      id: sessionData.userId,
+      id: sessionData.id,
       username: sessionData.username,
+      email: sessionData.email,
       role: sessionData.role,
     };
   } catch (error) {
