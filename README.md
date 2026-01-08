@@ -53,31 +53,69 @@ pnpm dev
 
 Vercel 对 Next.js 支持最好，推荐用于生产环境部署：
 
+#### 方式 1：通过 Vercel CLI
+
+```bash
+# 安装 Vercel CLI
+npm i -g vercel
+
+# 登录 Vercel
+vercel login
+
+# 部署到生产环境
+vercel --prod
+```
+
+#### 方式 2：通过 GitHub 集成（推荐）
+
 1. 访问 [vercel.com](https://vercel.com) 并注册账号
 2. 点击 "New Project" 按钮
-3. 导入你的 GitHub 仓库
-4. 点击 "Deploy" 按钮
+3. 导入你的 GitHub 仓库（已推送：`https://github.com/LC0225/file-encryptor-with-ticket.git`）
+4. 配置环境变量（见下方）
+5. 点击 "Deploy" 按钮
 
 **优势**：
-- ✅ 完全免费
+- ✅ 完全免费（个人版）
 - ✅ 自动 HTTPS
 - ✅ 自动构建和部署
 - ✅ 对 Next.js 16 完美支持
-- ✅ 全球 CDN 加速
+- ✅ 全球 CDN 加速（香港区域 hkg1）
+- ✅ 推送代码自动部署
 
 ### 环境变量配置
 
-如果需要启用云端数据同步功能，在 Vercel 项目设置中添加以下环境变量：
+在 Vercel 项目设置 → Environment Variables 中添加以下环境变量：
+
+#### 必需配置（Supabase）
 
 ```
-COZE_BUCKET_ENDPOINT_URL=your_bucket_endpoint
-COZE_BUCKET_NAME=your_bucket_name
+NEXT_PUBLIC_SUPABASE_URL=https://wzvpiyjxlaihcjgdchez.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6dnBpeWp4bGFpaGNqZ2RjaGV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjA1NDQsImV4cCI6MjA4MzQzNjU0NH0.BiDs5jYdHz6gAzIQCKNldden7OsAmQ3PXK-HYyvt4kk
+```
+
+#### 可选配置（数据库）
+
+```
+# 如果想在生产环境使用 PostgreSQL 数据库（默认使用 localStorage）
+USE_DATABASE=true
+DATABASE_URL=postgresql://postgres.8XctZ2JwUUjC0vE9@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres
 ```
 
 **说明**：
-- 如果不配置环境变量，应用将使用纯 localStorage 模式
-- 配置环境变量后，启用云端数据同步功能
-- 数据同步功能支持跨设备、跨浏览器访问
+- Supabase 配置用于云端数据同步（加密历史、用户数据）
+- 如果不配置数据库，应用将使用 localStorage 模式（适合个人使用）
+- 配置数据库后，数据将存储在 PostgreSQL 中（适合团队使用）
+
+### 部署检查清单
+
+- [ ] 代码已推送到 GitHub
+- [ ] 在 Vercel 导入了 GitHub 仓库
+- [ ] 配置了 Supabase 环境变量
+- [ ] （可选）配置了数据库环境变量
+- [ ] 首次部署成功，访问应用正常
+- [ ] 测试用户注册/登录功能
+- [ ] 测试文件加密/解密功能
+- [ ] 测试个人中心数据同步
 
 ### 本地构建
 

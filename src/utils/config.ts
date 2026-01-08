@@ -12,7 +12,7 @@ export function canUseDatabase(): boolean {
   if (process.env.USE_DATABASE === 'true') {
     return true;
   }
-  
+
   // 默认在开发环境使用数据库，生产环境使用localStorage
   return isDevelopment;
 }
