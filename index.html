@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件加密工具 - 安全保护您的文件</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 应用容器 -->
+    <div id="app"></div>
+
+    <script>
+        // 加密工具核心功能
+        const CryptoUtils = {
+            // 生成随机ticket
+            generateTicket() {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                let ticket = '';
+                for (let i = 0; i < 32; i++) {
+                    ticket += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return ticket;
+            },
+
+            // 字符串转Uint8Array
+            stringToUint8Array(str) {
+                return new TextEncoder().encode(str);
+            },
+
+            // Uint8Array转字符串
+            uint8ArrayToString(arr) {
+                return new TextDecoder().decode(arr);
+            },
+
+            // ArrayBuffer转Base64
+            arrayBufferToBase64(buffer) {
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return btoa(binary);
+            },
+
+            // Base64转ArrayBuffer
+            base64ToArrayBuffer(base64) {
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                return bytes.buffer;
+            },
+
+            // 使用ticket派生密钥
+            async deriveKey(ticket, salt) {
+                const ticketBytes = this.stringToUint8Array(ticket);
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    ticketBytes,
+                    'PBKDF2',
+                    false,
+                    ['deriveKey']
+                );
+
+                return crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+            },
+
+            // 加密文件
+            async encryptFile(file, ticket) {
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const salt = crypto.getRandomValues(new Uint8Array(16));
+                const key = await this.deriveKey(ticket, salt);
+
+                const fileBuffer = await file.arrayBuffer();
+                const encrypted = await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    key,
+                    fileBuffer
+                );
+
+                return {
+                    encryptedData: this.arrayBufferToBase64(encrypted),
+                    iv: this.arrayBufferToBase64(iv),
+                    salt: this.arrayBufferToBase64(salt),
+                    fileName: file.name,
+                    fileType: file.type
+                };
+            },
+
+            // 解密文件
+            async decryptFile(encryptedData, iv, salt, ticket, fileName, fileType) {
+                const key = await this.deriveKey(ticket, this.base64ToArrayBuffer(salt));
+
+                const decrypted = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: this.base64ToArrayBuffer(iv) },
+                    key,
+                    this.base64ToArrayBuffer(encryptedData)
+                );
+
+                return {
+                    decryptedData: new Blob([decrypted], { type: fileType || 'application/octet-stream' }),
+                    fileName: fileName || 'decrypted_file'
+                };
+            }
+        };
+
+        // 本地存储工具
+        const StorageUtils = {
+            TOKEN_KEY: 'crypto_auth_token',
+
+            // 获取所有用户
+            getUsers() {
+                const users = localStorage.getItem('crypto_users');
+                return users ? JSON.parse(users) : [];
+            },
+
+            // 保存用户列表
+            saveUsers(users) {
+                localStorage.setItem('crypto_users', JSON.stringify(users));
+            },
+
+            // 获取当前用户
+            getCurrentUser() {
+                const token = localStorage.getItem(this.TOKEN_KEY);
+                if (!token) return null;
+                try {
+                    const sessionData = JSON.parse(atob(token));
+                    return sessionData.user;
+                } catch (error) {
+                    return null;
+                }
+            },
+
+            // 设置当前用户
+            setCurrentUser(user) {
+                const sessionData = {
+                    user: user,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(this.TOKEN_KEY, btoa(JSON.stringify(sessionData)));
+            },
+
+            // 清除当前用户
+            clearCurrentUser() {
+                localStorage.removeItem(this.TOKEN_KEY);
+            },
+
+            // 获取加密历史
+            getEncryptionHistory() {
+                const history = localStorage.getItem('crypto_history');
+                return history ? JSON.parse(history) : [];
+            },
+
+            // 保存加密历史
+            saveEncryptionHistory(history) {
+                localStorage.setItem('crypto_history', JSON.stringify(history));
+            },
+
+            // 初始化管理员
+            initAdmin() {
+                const users = this.getUsers();
+                const adminExists = users.some(u => u.username === 'root');
+
+                if (!adminExists) {
+                    // 创建管理员
+                    const admin = {
+                        id: 'admin_' + Date.now(),
+                        username: 'root',
+                        passwordHash: this.hashPassword('BGSN123.321'),
+                        email: 'admin@system.local',
+                        role: 'admin',
+                        createdAt: new Date().toISOString()
+                    };
+                    users.push(admin);
+                    this.saveUsers(users);
+                }
+            },
+
+            // 密码哈希
+            async hashPassword(password) {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(password);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            },
+
+            // 验证密码
+            async validatePassword(inputPassword, storedHash) {
+                const inputHash = await this.hashPassword(inputPassword);
+                return inputHash === storedHash;
+            },
+
+            // 检查是否已登录
+            isLoggedIn() {
+                return !!localStorage.getItem(this.TOKEN_KEY);
+            }
+        };
+
+        // UI工具
+        const UIUtils = {
+            showElement(elementId) {
+                document.getElementById(elementId).classList.remove('hidden');
+            },
+
+            hideElement(elementId) {
+                document.getElementById(elementId).classList.add('hidden');
+            },
+
+            showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg ${
+                    type === 'success' ? 'bg-green-500 text-white' :
+                    type === 'error' ? 'bg-red-500 text-white' :
+                    'bg-blue-500 text-white'
+                }`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            },
+
+            setElementText(elementId, text) {
+                document.getElementById(elementId).textContent = text;
+            },
+
+            setElementHTML(elementId, html) {
+                document.getElementById(elementId).innerHTML = html;
+            }
+        };
+
+        // 页面渲染
+        const Pages = {
+            // 登录页
+            renderLogin() {
+                return `
+                    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
+                        <div class="w-full max-w-md">
+                            <div class="text-center mb-8">
+                                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">文件加密工具</h1>
+                                <p class="mt-2 text-gray-600 dark:text-gray-400">登录到您的账号</p>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-lg p-8 dark:bg-gray-800">
+                                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6">欢迎回来</h2>
+
+                                <form id="loginForm" class="space-y-6">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">用户名</label>
+                                        <input type="text" id="loginUsername" required placeholder="请输入用户名"
+                                            class="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">密码</label>
+                                        <input type="password" id="loginPassword" required placeholder="请输入密码"
+                                            class="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <div id="loginError" class="hidden rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400"></div>
+
+                                    <button type="submit" id="loginBtn"
+                                        class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 dark:hover:bg-blue-700">
+                                        登录
+                                    </button>
+                                </form>
+
+                                <div class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+                                    还没有账号？
+                                    <a href="#" id="gotoRegister" class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">立即注册</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 注册页
+            renderRegister() {
+                return `
+                    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
+                        <div class="w-full max-w-md">
+                            <div class="text-center mb-8">
+                                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">文件加密工具</h1>
+                                <p class="mt-2 text-gray-600 dark:text-gray-400">注册新账号</p>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-lg p-8 dark:bg-gray-800">
+                                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6">创建账号</h2>
+
+                                <form id="registerForm" class="space-y-6">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">用户名</label>
+                                        <input type="text" id="registerUsername" required placeholder="请输入用户名"
+                                            class="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">邮箱（可选）</label>
+                                        <input type="email" id="registerEmail" placeholder="请输入邮箱"
+                                            class="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">密码</label>
+                                        <input type="password" id="registerPassword" required placeholder="请输入密码（至少8位，包含大小写字母和数字）"
+                                            class="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <div id="registerError" class="hidden rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400"></div>
+
+                                    <button type="submit" id="registerBtn"
+                                        class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 dark:hover:bg-blue-700">
+                                        注册
+                                    </button>
+                                </form>
+
+                                <div class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+                                    已有账号？
+                                    <a href="#" id="gotoLogin" class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">立即登录</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // 主页
+            renderHome() {
+                const user = StorageUtils.getCurrentUser();
+                const isAdmin = user && user.role === 'admin';
+
+                return `
+                    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+                        <nav class="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80">
+                            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                                <div class="flex h-16 items-center justify-between">
+                                    <h1 class="text-xl font-bold text-gray-900 dark:text-white">文件加密工具</h1>
+                                    <div class="flex items-center gap-4">
+                                        ${isAdmin ? `<a href="#" id="gotoAdmin" class="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">管理员面板</a>` : ''}
+                                        <a href="#" id="gotoProfile" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">个人中心</a>
+                                        <button id="logoutBtn" class="rounded-lg border border-red-600 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20">退出登录</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <main class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+                            <div class="space-y-8">
+                                <div class="text-center">
+                                    <h2 class="text-3xl font-bold text-gray-900 dark:text-white">安全文件加密</h2>
+                                    <p class="mt-2 text-gray-600 dark:text-gray-400">支持文档、图片、视频、音频等常用文件类型，每个文件独立ticket保护</p>
+                                </div>
+
+                                <div class="flex justify-center gap-4">
+                                    <button id="encryptModeBtn" class="rounded-lg px-6 py-3 font-medium transition-colors bg-blue-600 text-white">加密文件</button>
+                                    <button id="decryptModeBtn" class="rounded-lg px-6 py-3 font-medium transition-colors bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">解密文件</button>
+                                </div>
+
+                                <div id="mainCard" class="rounded-xl bg-white p-8 shadow-lg dark:bg-gray-800">
+                                    <div class="mb-6">
+                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">选择文件</label>
+                                        <input type="file" id="fileInput" class="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 dark:border-gray-600 dark:bg-gray-700">
+                                    </div>
+
+                                    <div id="ticketSection" class="mb-6 hidden">
+                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Ticket（解密密钥）</label>
+                                        <div class="flex gap-2">
+                                            <input type="text" id="ticketInput" placeholder="输入解密ticket"
+                                                class="flex-1 rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                            <button id="generateTicketBtn" class="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">生成Ticket</button>
+                                        </div>
+                                    </div>
+
+                                    <button id="processBtn" disabled class="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600">加密文件</button>
+
+                                    <div id="resultSection" class="mt-6"></div>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                `;
+            },
+
+            // 个人中心
+            renderProfile() {
+                return `
+                    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+                        <nav class="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80">
+                            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                                <div class="flex h-16 items-center justify-between">
+                                    <h1 class="text-xl font-bold text-gray-900 dark:text-white">个人中心</h1>
+                                    <div class="flex items-center gap-4">
+                                        <a href="#" id="gotoHome" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">返回主页</a>
+                                        <button id="logoutBtn" class="rounded-lg border border-red-600 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20">退出登录</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <main class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+                            <div class="bg-white rounded-xl shadow-lg p-8 dark:bg-gray-800">
+                                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">加密历史记录</h2>
+                                <div id="historyList"></div>
+                            </div>
+                        </main>
+                    </div>
+                `;
+            },
+
+            // 管理员面板
+            renderAdmin() {
+                return `
+                    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+                        <nav class="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80">
+                            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                                <div class="flex h-16 items-center justify-between">
+                                    <h1 class="text-xl font-bold text-gray-900 dark:text-white">管理员面板</h1>
+                                    <div class="flex items-center gap-4">
+                                        <a href="#" id="gotoHome" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">返回主页</a>
+                                        <button id="logoutBtn" class="rounded-lg border border-red-600 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20">退出登录</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <main class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+                            <div class="bg-white rounded-xl shadow-lg p-8 dark:bg-gray-800">
+                                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">用户管理</h2>
+                                <div id="userList"></div>
+                            </div>
+                        </main>
+                    </div>
+                `;
+            }
+        };
+
+        // 应用控制器
+        const App = {
+            currentMode: 'encrypt',
+
+            init() {
+                StorageUtils.initAdmin();
+
+                if (StorageUtils.isLoggedIn()) {
+                    this.renderHome();
+                } else {
+                    this.renderLogin();
+                }
+            },
+
+            renderLogin() {
+                UIUtils.setElementHTML('app', Pages.renderLogin());
+                this.attachLoginHandlers();
+            },
+
+            renderRegister() {
+                UIUtils.setElementHTML('app', Pages.renderRegister());
+                this.attachRegisterHandlers();
+            },
+
+            renderHome() {
+                if (!StorageUtils.isLoggedIn()) {
+                    this.renderLogin();
+                    return;
+                }
+                UIUtils.setElementHTML('app', Pages.renderHome());
+                this.attachHomeHandlers();
+            },
+
+            renderProfile() {
+                UIUtils.setElementHTML('app', Pages.renderProfile());
+                this.attachProfileHandlers();
+            },
+
+            renderAdmin() {
+                UIUtils.setElementHTML('app', Pages.renderAdmin());
+                this.attachAdminHandlers();
+            },
+
+            attachLoginHandlers() {
+                document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const username = document.getElementById('loginUsername').value;
+                    const password = document.getElementById('loginPassword').value;
+
+                    const users = StorageUtils.getUsers();
+                    const user = users.find(u => u.username === username);
+
+                    if (!user) {
+                        UIUtils.showElement('loginError');
+                        document.getElementById('loginError').textContent = '用户名或密码错误';
+                        return;
+                    }
+
+                    const isValid = await StorageUtils.validatePassword(password, user.passwordHash);
+                    if (!isValid) {
+                        UIUtils.showElement('loginError');
+                        document.getElementById('loginError').textContent = '用户名或密码错误';
+                        return;
+                    }
+
+                    StorageUtils.setCurrentUser(user);
+                    this.renderHome();
+                });
+
+                document.getElementById('gotoRegister').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.renderRegister();
+                });
+            },
+
+            attachRegisterHandlers() {
+                document.getElementById('registerForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const username = document.getElementById('registerUsername').value;
+                    const email = document.getElementById('registerEmail').value;
+                    const password = document.getElementById('registerPassword').value;
+
+                    // 密码验证
+                    if (password.length < 8) {
+                        UIUtils.showElement('registerError');
+                        document.getElementById('registerError').textContent = '密码至少需要8位';
+                        return;
+                    }
+                    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+                        UIUtils.showElement('registerError');
+                        document.getElementById('registerError').textContent = '密码必须包含大小写字母和数字';
+                        return;
+                    }
+
+                    const users = StorageUtils.getUsers();
+                    if (users.some(u => u.username === username)) {
+                        UIUtils.showElement('registerError');
+                        document.getElementById('registerError').textContent = '用户名已存在';
+                        return;
+                    }
+
+                    const newUser = {
+                        id: 'user_' + Date.now(),
+                        username,
+                        email: email || undefined,
+                        passwordHash: await StorageUtils.hashPassword(password),
+                        role: 'user',
+                        createdAt: new Date().toISOString()
+                    };
+
+                    users.push(newUser);
+                    StorageUtils.saveUsers(users);
+                    StorageUtils.setCurrentUser(newUser);
+                    this.renderHome();
+                });
+
+                document.getElementById('gotoLogin').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.renderLogin();
+                });
+            },
+
+            attachHomeHandlers() {
+                const fileInput = document.getElementById('fileInput');
+                const ticketInput = document.getElementById('ticketInput');
+                const ticketSection = document.getElementById('ticketSection');
+                const generateTicketBtn = document.getElementById('generateTicketBtn');
+                const processBtn = document.getElementById('processBtn');
+                const resultSection = document.getElementById('resultSection');
+
+                document.getElementById('encryptModeBtn').addEventListener('click', () => {
+                    this.currentMode = 'encrypt';
+                    document.getElementById('encryptModeBtn').className = 'rounded-lg px-6 py-3 font-medium transition-colors bg-blue-600 text-white';
+                    document.getElementById('decryptModeBtn').className = 'rounded-lg px-6 py-3 font-medium transition-colors bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700';
+                    UIUtils.hideElement('ticketSection');
+                    processBtn.textContent = '加密文件';
+                    resultSection.innerHTML = '';
+                });
+
+                document.getElementById('decryptModeBtn').addEventListener('click', () => {
+                    this.currentMode = 'decrypt';
+                    document.getElementById('decryptModeBtn').className = 'rounded-lg px-6 py-3 font-medium transition-colors bg-blue-600 text-white';
+                    document.getElementById('encryptModeBtn').className = 'rounded-lg px-6 py-3 font-medium transition-colors bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700';
+                    UIUtils.showElement('ticketSection');
+                    processBtn.textContent = '解密文件';
+                    resultSection.innerHTML = '';
+                });
+
+                generateTicketBtn.addEventListener('click', () => {
+                    ticketInput.value = CryptoUtils.generateTicket();
+                });
+
+                fileInput.addEventListener('change', () => {
+                    if (fileInput.files.length > 0) {
+                        processBtn.disabled = false;
+                    }
+                });
+
+                processBtn.addEventListener('click', async () => {
+                    const file = fileInput.files[0];
+                    if (!file) return;
+
+                    const ticket = ticketInput.value || CryptoUtils.generateTicket();
+                    if (!ticketInput.value && this.currentMode === 'encrypt') {
+                        ticketInput.value = ticket;
+                    }
+
+                    if (this.currentMode === 'encrypt') {
+                        processBtn.disabled = true;
+                        processBtn.textContent = '加密中...';
+
+                        try {
+                            const result = await CryptoUtils.encryptFile(file, ticket);
+
+                            // 保存历史记录
+                            const history = StorageUtils.getEncryptionHistory();
+                            history.unshift({
+                                ...result,
+                                ticket,
+                                timestamp: new Date().toISOString(),
+                                fileSize: file.size
+                            });
+                            StorageUtils.saveEncryptionHistory(history);
+
+                            resultSection.innerHTML = `
+                                <div class="mt-6 space-y-4">
+                                    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
+                                        <h3 class="font-semibold text-gray-900 dark:text-white mb-2">加密成功</h3>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">文件名：${result.fileName}</p>
+                                        <button id="downloadBtn" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">下载加密文件</button>
+                                    </div>
+                                    <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                                        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Ticket（解密密钥）</p>
+                                        <code class="block break-all rounded bg-gray-100 p-2 text-xs text-gray-800 dark:bg-gray-700 dark:text-gray-200">${ticket}</code>
+                                        <button id="copyTicketBtn" class="mt-2 text-xs text-blue-600 hover:text-blue-700">复制</button>
+                                    </div>
+                                </div>
+                            `;
+
+                            document.getElementById('downloadBtn').addEventListener('click', () => {
+                                const content = JSON.stringify(result, null, 2);
+                                const blob = new Blob([content], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${result.fileName}.encrypted`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            });
+
+                            document.getElementById('copyTicketBtn').addEventListener('click', () => {
+                                navigator.clipboard.writeText(ticket);
+                                UIUtils.showToast('Ticket已复制到剪贴板', 'success');
+                            });
+
+                        } catch (error) {
+                            resultSection.innerHTML = `<div class="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">加密失败：${error.message}</div>`;
+                        }
+
+                        processBtn.disabled = false;
+                        processBtn.textContent = '加密文件';
+
+                    } else {
+                        // 解密模式
+                        processBtn.disabled = true;
+                        processBtn.textContent = '解密中...';
+
+                        try {
+                            const fileContent = await file.text();
+                            let data, iv, salt, fileName, fileType;
+
+                            try {
+                                const jsonData = JSON.parse(fileContent);
+                                data = jsonData.data;
+                                iv = jsonData.iv;
+                                salt = jsonData.salt;
+                                fileName = jsonData.fileName;
+                                fileType = jsonData.fileType;
+                            } catch (e) {
+                                throw new Error('无效的加密文件格式');
+                            }
+
+                            const result = await CryptoUtils.decryptFile(data, iv, salt, ticket, fileName, fileType);
+
+                            resultSection.innerHTML = `
+                                <div class="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
+                                    <div class="flex items-center gap-2 mb-3 text-green-600 dark:text-green-400">
+                                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <h3 class="font-semibold text-green-600 dark:text-green-400">解密成功</h3>
+                                    </div>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">文件名：${result.fileName}</p>
+                                    <button id="downloadBtn" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">下载解密文件</button>
+                                </div>
+                            `;
+
+                            document.getElementById('downloadBtn').addEventListener('click', () => {
+                                const url = URL.createObjectURL(result.decryptedData);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = result.fileName;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            });
+
+                        } catch (error) {
+                            resultSection.innerHTML = `<div class="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">解密失败：${error.message || '密钥错误或文件损坏'}</div>`;
+                        }
+
+                        processBtn.disabled = false;
+                        processBtn.textContent = '解密文件';
+                    }
+                });
+
+                document.getElementById('gotoProfile').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.renderProfile();
+                });
+
+                document.getElementById('gotoAdmin')?.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.renderAdmin();
+                });
+
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    StorageUtils.clearCurrentUser();
+                    this.renderLogin();
+                });
+            },
+
+            attachProfileHandlers() {
+                const historyList = document.getElementById('historyList');
+                const history = StorageUtils.getEncryptionHistory();
+
+                if (history.length === 0) {
+                    historyList.innerHTML = '<p class="text-gray-600 dark:text-gray-400">暂无加密记录</p>';
+                } else {
+                    historyList.innerHTML = history.map(item => `
+                        <div class="mb-4 p-4 bg-gray-50 rounded-lg dark:bg-gray-700">
+                            <h3 class="font-medium text-gray-900 dark:text-white">${item.fileName}</h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">操作：加密 | 时间：${new Date(item.timestamp).toLocaleString()}</p>
+                            <div class="mt-2">
+                                <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Ticket：</p>
+                                <code class="text-xs text-gray-600 dark:text-gray-400 break-all">${item.ticket}</code>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                document.getElementById('gotoHome').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.renderHome();
+                });
+
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    StorageUtils.clearCurrentUser();
+                    this.renderLogin();
+                });
+            },
+
+            attachAdminHandlers() {
+                const userList = document.getElementById('userList');
+                const users = StorageUtils.getUsers();
+
+                userList.innerHTML = `
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">用户名</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">角色</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">创建时间</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                            ${users.map(user => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${user.username}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${user.role === 'admin' ? '管理员' : '用户'}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${new Date(user.createdAt).toLocaleString()}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        ${user.role !== 'admin' ? `<button class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" data-userid="${user.id}" data-action="delete">删除</button>` : '<span class="text-gray-400">不可删除</span>'}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                userList.querySelectorAll('[data-action="delete"]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const userId = e.target.dataset.userid;
+                        if (confirm('确定要删除此用户吗？')) {
+                            const users = StorageUtils.getUsers().filter(u => u.id !== userId);
+                            StorageUtils.saveUsers(users);
+                            this.renderAdmin();
+                            UIUtils.showToast('用户已删除', 'success');
+                        }
+                    });
+                });
+
+                document.getElementById('gotoHome').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.renderHome();
+                });
+
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    StorageUtils.clearCurrentUser();
+                    this.renderLogin();
+                });
+            }
+        };
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            App.init();
+        });
+    </script>
+</body>
+</html>
