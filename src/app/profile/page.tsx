@@ -112,9 +112,12 @@ export default function Profile() {
           <div className="flex h-16 items-center justify-between">
             <Link
               href="/"
-              className="text-xl font-bold text-gray-900 dark:text-white hover:underline"
+              className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
-              文件加密工具
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              返回主页
             </Link>
             <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
               个人中心
