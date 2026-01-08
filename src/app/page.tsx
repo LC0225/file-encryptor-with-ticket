@@ -328,14 +328,24 @@ export default function Home() {
                   type="file"
                   onChange={handleFileChange}
                   multiple={mode === 'encrypt'}
-                  className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  className="block flex-1 rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 />
-                <button
-                  onClick={reset}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                >
-                  重置
-                </button>
+                {(files.length > 0 || ticket || encryptedFiles.length > 0 || decryptedFile) && (
+                  <button
+                    onClick={() => {
+                      if (confirm('确定要清空所有内容吗？')) {
+                        reset();
+                      }
+                    }}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-red-900/20 dark:hover:border-red-700 dark:hover:text-red-400 transition-colors"
+                    title="清空所有内容"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    清空
+                  </button>
+                )}
               </div>
               {files.length > 0 && (
                 <div className="mt-2">
@@ -431,7 +441,13 @@ export default function Home() {
             {mode === 'encrypt' && encryptedFiles.length > 0 && (
               <div className="mt-6 space-y-4">
                 {encryptedFiles.length > 1 && (
-                  <div className="flex justify-end">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>加密成功！共 {encryptedFiles.length} 个文件</span>
+                    </div>
                     <button
                       onClick={downloadAllEncryptedFiles}
                       className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
@@ -484,29 +500,78 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
+                {/* 继续加密按钮 */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setFiles([]);
+                      setEncryptedFiles([]);
+                      setError('');
+                      setSuccess('');
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                      fileInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-2 rounded-lg border border-blue-600 px-6 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    继续加密其他文件
+                  </button>
+                </div>
               </div>
             )}
 
             {/* 解密结果 */}
             {mode === 'decrypt' && decryptedFile && (
-              <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
-                <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">
-                  解密成功
-                </h3>
-                <div className="mb-3 flex items-center gap-2">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    文件名：{decryptedFile.fileName}
-                  </p>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(decryptedFile.fileType)}`}>
-                    {getFileTypeLabel(decryptedFile.fileType)}
-                  </span>
+              <div className="mt-6 space-y-4">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
+                  <div className="flex items-center gap-2 mb-3 text-green-600 dark:text-green-400">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <h3 className="font-semibold text-green-600 dark:text-green-400">
+                      解密成功
+                    </h3>
+                  </div>
+                  <div className="mb-3 flex items-center gap-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      文件名：{decryptedFile.fileName}
+                    </p>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(decryptedFile.fileType)}`}>
+                      {getFileTypeLabel(decryptedFile.fileType)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={downloadDecryptedFile}
+                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
+                  >
+                    下载解密文件
+                  </button>
                 </div>
-                <button
-                  onClick={downloadDecryptedFile}
-                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
-                >
-                  下载解密文件
-                </button>
+                {/* 继续解密按钮 */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setFiles([]);
+                      setDecryptedFile(null);
+                      setError('');
+                      setSuccess('');
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                      fileInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-2 rounded-lg border border-blue-600 px-6 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    继续解密其他文件
+                  </button>
+                </div>
               </div>
             )}
           </div>
