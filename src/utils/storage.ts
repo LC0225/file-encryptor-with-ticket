@@ -1,12 +1,6 @@
 import { EncryptionResult } from './crypto';
 import { syncToCloud } from './dataSync';
-
-export interface EncryptionHistory extends EncryptionResult {
-  id: string;
-  ticket: string;
-  createdAt: string;
-  fileSize: number;
-}
+import { EncryptionHistory } from '@/types';
 
 const STORAGE_KEY = 'encryption_history';
 
@@ -15,7 +9,7 @@ const STORAGE_KEY = 'encryption_history';
  */
 export function getEncryptionHistory(): EncryptionHistory[] {
   if (typeof window === 'undefined') return [];
-  
+
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : [];
@@ -86,29 +80,4 @@ export function clearEncryptionHistory(): void {
   } catch (error) {
     console.error('清空加密历史失败:', error);
   }
-}
-
-/**
- * 格式化文件大小
- */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
-
-/**
- * 格式化日期
- */
-export function formatDate(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }

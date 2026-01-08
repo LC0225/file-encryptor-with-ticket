@@ -7,8 +7,6 @@ import {
   getEncryptionHistory,
   deleteEncryptionHistory,
   clearEncryptionHistory,
-  formatFileSize,
-  formatDate,
 } from '@/utils/storage';
 import { getCurrentUser, logoutUser, isLoggedIn } from '@/utils/auth';
 import {
@@ -16,16 +14,26 @@ import {
   fullSync,
   initSyncStatus,
   formatSyncTime,
-  type SyncStatus as SyncStatusType,
 } from '@/utils/dataSync';
+import type { SyncStatus } from '@/types';
+import {
+  getFileTypeLabel,
+  getFileTypeColor,
+  formatFileSize,
+  formatDate,
+  downloadEncryptedFile as downloadEncryptedFileUtil,
+  copyToClipboard,
+} from '@/utils/fileHelper';
+import { useToast } from '@/components/ToastContext';
 
 export default function Profile() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [history, setHistory] = useState<ReturnType<typeof getEncryptionHistory>>([]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
-  const [syncStatus, setSyncStatus] = useState<SyncStatusType>({
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     enabled: true,
     lastSyncTime: null,
     syncing: false,
@@ -62,31 +70,22 @@ export default function Profile() {
     setHistory(getEncryptionHistory());
   };
 
-  const handleCopyTicket = (ticket: string) => {
-    navigator.clipboard.writeText(ticket);
-    alert('Ticket已复制到剪贴板');
+  const handleCopyTicket = async (ticket: string) => {
+    const success = await copyToClipboard(ticket);
+    if (success) {
+      showToast({ type: 'success', message: 'Ticket已复制到剪贴板', duration: 2000 });
+    } else {
+      showToast({ type: 'error', message: '复制失败，请手动复制', duration: 3000 });
+    }
   };
 
   const handleDownloadEncryptedFile = (item: any) => {
-    const content = JSON.stringify(
-      {
-        data: item.encryptedData,
-        iv: item.iv,
-        fileName: item.fileName,
-        fileType: item.fileType,
-      },
-      null,
-      2
+    downloadEncryptedFileUtil(
+      item.encryptedData,
+      item.iv,
+      item.fileName,
+      item.fileType
     );
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${item.fileName}.encrypted`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const handleDelete = (id: string) => {
@@ -108,31 +107,6 @@ export default function Profile() {
       clearEncryptionHistory();
       loadHistory();
     }
-  };
-
-  const getFileTypeLabel = (fileType: string) => {
-    if (!fileType) return '未知类型';
-    if (fileType.includes('pdf')) return 'PDF';
-    if (fileType.includes('word') || fileType.includes('document')) return 'Word';
-    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'Excel';
-    if (fileType.includes('presentation') || fileType.includes('powerpoint')) return 'PPT';
-    if (fileType.includes('image') || fileType.includes('png') || fileType.includes('jpeg') || fileType.includes('jpg')) return '图片';
-    if (fileType.includes('video')) return '视频';
-    if (fileType.includes('audio')) return '音频';
-    if (fileType.includes('text') || fileType.includes('plain')) return '文本';
-    return '其他';
-  };
-
-  const getFileTypeColor = (fileType: string) => {
-    if (!fileType) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    if (fileType.includes('pdf')) return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-    if (fileType.includes('word') || fileType.includes('document')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-    if (fileType.includes('presentation') || fileType.includes('powerpoint')) return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
-    if (fileType.includes('image')) return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-    if (fileType.includes('video')) return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300';
-    if (fileType.includes('audio')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-    return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   };
 
   const downloadAllEncryptedFiles = () => {

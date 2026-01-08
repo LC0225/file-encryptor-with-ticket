@@ -42,10 +42,6 @@ pnpm dev
 
 应用将在 http://localhost:5000 启动。
 
-### 数据库（本地开发）
-
-本地开发环境会自动使用PostgreSQL数据库（通过 `coze-coding-dev-sdk`），支持跨设备同步。
-
 ### 管理员账号
 
 - 用户名: `root`
@@ -57,25 +53,44 @@ pnpm dev
 
 Vercel 对 Next.js 支持最好，推荐用于生产环境部署：
 
-1. Fork 本仓库到你的 GitHub
-2. 在 Vercel 导入项目
-3. Vercel 会自动构建和部署
+1. 访问 [vercel.com](https://vercel.com) 并注册账号
+2. 点击 "New Project" 按钮
+3. 导入你的 GitHub 仓库
+4. 点击 "Deploy" 按钮
 
-### Netlify 部署
+**优势**：
+- ✅ 完全免费
+- ✅ 自动 HTTPS
+- ✅ 自动构建和部署
+- ✅ 对 Next.js 16 完美支持
+- ✅ 全球 CDN 加速
 
-由于 Next.js 16 对 Netlify 支持有限，当前配置可能在 Netlify 上遇到问题。
+### 环境变量配置
 
-Netlify 部署时，应用会自动使用 localStorage 方案，无需数据库配置。
+如果需要启用云端数据同步功能，在 Vercel 项目设置中添加以下环境变量：
 
-### 静态导出（备用方案）
-
-如果需要完全静态的部署方案，可以使用以下命令：
-
-```bash
-pnpm run build
+```
+COZE_BUCKET_ENDPOINT_URL=your_bucket_endpoint
+COZE_BUCKET_NAME=your_bucket_name
 ```
 
-然后将 `out` 目录部署到任何静态托管服务。
+**说明**：
+- 如果不配置环境变量，应用将使用纯 localStorage 模式
+- 配置环境变量后，启用云端数据同步功能
+- 数据同步功能支持跨设备、跨浏览器访问
+
+### 本地构建
+
+```bash
+# 安装依赖
+pnpm install
+
+# 构建生产版本
+pnpm run build
+
+# 启动生产服务器
+pnpm start
+```
 
 ## 数据存储说明
 
@@ -133,11 +148,16 @@ pnpm run build
 │   │   ├── register/          # 注册页
 │   │   ├── profile/           # 个人中心
 │   │   └── admin/             # 管理员面板
+│   ├── components/            # React 组件
+│   │   ├── Toast.tsx          # Toast 提示组件
+│   │   └── ToastContext.tsx   # Toast Context
 │   ├── storage/
 │   │   └── database/          # 数据库相关
 │   │       ├── shared/
 │   │       │   └── schema.ts  # 数据库表结构
 │   │       └── userManager.ts # 用户管理 Manager
+│   ├── types/                 # TypeScript 类型定义
+│   │   └── index.ts
 │   └── utils/
 │       ├── auth.ts            # 认证工具（双模式）
 │       ├── authLocalStorage.ts # localStorage 认证实现（含云同步）
@@ -145,8 +165,11 @@ pnpm run build
 │       ├── crypto.ts          # 加密工具
 │       ├── storage.ts         # 本地存储工具（含云同步）
 │       ├── dataSync.ts        # 数据同步服务
-│       └── s3Storage.ts       # 对象存储工具
+│       ├── s3Storage.ts       # 对象存储工具
+│       └── fileHelper.ts      # 文件处理工具
 ├── public/                    # 静态资源
+├── .env.example               # 环境变量示例
+├── vercel.json                # Vercel 配置
 └── package.json               # 项目依赖
 ```
 

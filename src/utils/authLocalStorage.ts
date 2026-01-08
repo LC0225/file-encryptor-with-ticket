@@ -1,14 +1,8 @@
 import { Buffer } from 'buffer';
 import { syncToCloud, syncFromCloud } from './dataSync';
+import type { User as UserType } from '@/types';
 
-export interface User {
-  id: string;
-  username: string;
-  passwordHash: string;
-  email?: string;
-  createdAt: string;
-  role: 'admin' | 'user';
-}
+export type { UserType as User };
 
 const USERS_KEY = 'crypto_users';
 const SESSION_KEY = 'crypto_session';
@@ -53,7 +47,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 /**
  * 获取所有用户
  */
-function getUsers(): User[] {
+function getUsers(): UserType[] {
   if (typeof window === 'undefined') return [];
   try {
     const data = localStorage.getItem(USERS_KEY);
@@ -67,7 +61,7 @@ function getUsers(): User[] {
 /**
  * 保存用户数据
  */
-function saveUsers(users: User[]): void {
+function saveUsers(users: UserType[]): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
@@ -82,7 +76,7 @@ function saveUsers(users: User[]): void {
 export async function initAdminUser(): Promise<void> {
   const users = getUsers();
   if (users.length === 0) {
-    const admin: User = {
+    const admin: UserType = {
       id: 'admin_' + Date.now(),
       username: 'root',
       passwordHash: await hashPassword('BGSN123.321'),
@@ -116,7 +110,7 @@ export async function registerUser(
   }
 
   // 创建新用户
-  const newUser: User = {
+  const newUser: UserType = {
     id: 'user_' + Date.now(),
     username,
     passwordHash: await hashPassword(password),

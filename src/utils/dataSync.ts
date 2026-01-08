@@ -1,36 +1,7 @@
 import { User } from './authLocalStorage';
-import { EncryptionHistory } from './storage';
+import { EncryptionHistory } from '@/types';
 import { uploadAppData, downloadAppData, checkCloudDataExists } from './s3Storage';
-
-/**
- * 应用数据结构（云端存储格式）
- */
-export interface AppData {
-  version: number;        // 时间戳版本
-  users: User[];
-  history: EncryptionHistory[];
-}
-
-/**
- * 同步结果
- */
-export interface SyncResult {
-  success: boolean;
-  message: string;
-  downloaded?: boolean;   // 是否从云端下载了数据
-  uploaded?: boolean;     // 是否上传了数据到云端
-  conflict?: boolean;     // 是否发生了冲突
-}
-
-/**
- * 同步状态
- */
-export interface SyncStatus {
-  enabled: boolean;      // 是否启用云同步
-  lastSyncTime: number | null;  // 最后同步时间
-  syncing: boolean;      // 是否正在同步
-  cloudExists: boolean;  // 云端数据是否存在
-}
+import type { AppData, SyncResult, SyncStatus } from '@/types';
 
 // 同步状态（存储在 localStorage）
 const SYNC_STATUS_KEY = 'crypto_sync_status';
