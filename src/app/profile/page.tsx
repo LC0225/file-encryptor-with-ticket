@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   getEncryptionHistory,
   deleteEncryptionHistory,
@@ -9,15 +10,23 @@ import {
   formatFileSize,
   formatDate,
 } from '@/utils/storage';
+import { getCurrentUser, logoutUser, isLoggedIn } from '@/utils/auth';
 
 export default function Profile() {
+  const router = useRouter();
   const [history, setHistory] = useState<ReturnType<typeof getEncryptionHistory>>([]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState(getCurrentUser());
 
   useEffect(() => {
+    // 登录检查
+    if (!isLoggedIn()) {
+      router.push('/login');
+      return;
+    }
     loadHistory();
-  }, []);
+  }, [router]);
 
   const loadHistory = () => {
     setHistory(getEncryptionHistory());
@@ -110,17 +119,41 @@ export default function Profile() {
       <nav className="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              返回主页
-            </Link>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              个人中心
+            <div className="flex items-center gap-4">
+              <Link
+                href="/"
+                className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                返回主页
+              </Link>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {currentUser?.username}
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              {currentUser?.role === 'admin' && (
+                <Link
+                  href="/admin"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                >
+                  管理员面板
+                </Link>
+              )}
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                个人中心
+              </div>
+              <button
+                onClick={() => {
+                  logoutUser();
+                  router.push('/login');
+                }}
+                className="rounded-lg border border-red-600 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                退出登录
+              </button>
             </div>
           </div>
         </div>

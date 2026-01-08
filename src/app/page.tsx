@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   encryptFile,
   encryptFiles,
@@ -9,6 +10,7 @@ import {
   generateTicket,
 } from '@/utils/crypto';
 import { addEncryptionHistory } from '@/utils/storage';
+import { getCurrentUser, logoutUser, isLoggedIn } from '@/utils/auth';
 
 interface EncryptedFileResult {
   encryptedData: string;
@@ -19,6 +21,7 @@ interface EncryptedFileResult {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [ticket, setTicket] = useState('');
   const [mode, setMode] = useState<'encrypt' | 'decrypt'>('encrypt');
@@ -32,6 +35,14 @@ export default function Home() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentUser, setCurrentUser] = useState(getCurrentUser());
+
+  // 登录检查
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.push('/login');
+    }
+  }, [router]);
 
   // 从session storage读取ticket
   useEffect(() => {
@@ -251,12 +262,31 @@ export default function Home() {
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">
               文件加密工具
             </h1>
-            <Link
-              href="/profile"
-              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-            >
-              个人中心
-            </Link>
+            <div className="flex items-center gap-4">
+              {currentUser?.role === 'admin' && (
+                <Link
+                  href="/admin"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                >
+                  管理员面板
+                </Link>
+              )}
+              <Link
+                href="/profile"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                个人中心
+              </Link>
+              <button
+                onClick={() => {
+                  logoutUser();
+                  router.push('/login');
+                }}
+                className="rounded-lg border border-red-600 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                退出登录
+              </button>
+            </div>
           </div>
         </div>
       </nav>
