@@ -109,13 +109,17 @@ export async function decryptFile(
 }
 
 /**
- * 批量加密文件
+ * 批量加密文件（每个文件独立ticket）
  */
-export async function encryptFiles(files: File[], ticket: string): Promise<EncryptionResult[]> {
-  const results: EncryptionResult[] = [];
+export async function encryptFiles(files: File[]): Promise<Array<EncryptionResult & { ticket: string }>> {
+  const results: Array<EncryptionResult & { ticket: string }> = [];
   for (const file of files) {
+    const ticket = generateTicket();
     const result = await encryptFile(file, ticket);
-    results.push(result);
+    results.push({
+      ...result,
+      ticket,
+    });
   }
   return results;
 }

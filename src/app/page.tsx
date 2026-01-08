@@ -10,16 +10,19 @@ import {
 } from '@/utils/crypto';
 import { addEncryptionHistory } from '@/utils/storage';
 
+interface EncryptedFileResult {
+  encryptedData: string;
+  iv: string;
+  fileName: string;
+  fileType: string;
+  ticket: string;
+}
+
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
   const [ticket, setTicket] = useState('');
   const [mode, setMode] = useState<'encrypt' | 'decrypt'>('encrypt');
-  const [encryptedFile, setEncryptedFile] = useState<{
-    data: string;
-    iv: string;
-    fileName: string;
-    fileType: string;
-  } | null>(null);
+  const [encryptedFiles, setEncryptedFiles] = useState<EncryptedFileResult[]>([]);
   const [decryptedFile, setDecryptedFile] = useState<{
     data: Blob;
     fileName: string;
@@ -29,7 +32,6 @@ export default function Home() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const decryptDataInputRef = useRef<HTMLInputElement>(null);
 
   // 从session storage读取ticket
   useEffect(() => {
@@ -44,7 +46,10 @@ export default function Home() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     setFiles(selectedFiles);
+    setEncryptedFiles([]);
+    setDecryptedFile(null);
     setError('');
+    setSuccess('');
   };
 
   const handleEncrypt = async () => {
@@ -53,38 +58,46 @@ export default function Home() {
       return;
     }
 
-    const ticketToUse = ticket || generateTicket();
-    if (!ticket) {
-      setTicket(ticketToUse);
-    }
-
     setLoading(true);
     setError('');
     setSuccess('');
+    setEncryptedFiles([]);
 
     try {
       if (files.length === 1) {
+        // 单文件加密：使用手动输入的ticket或自动生成
+        const ticketToUse = ticket || generateTicket();
+        if (!ticket) {
+          setTicket(ticketToUse);
+        }
         const result = await encryptFile(files[0], ticketToUse);
-        setEncryptedFile({
-          data: result.encryptedData,
+        const encryptedResult: EncryptedFileResult = {
+          encryptedData: result.encryptedData,
           iv: result.iv,
           fileName: result.fileName,
           fileType: result.fileType,
-        });
+          ticket: ticketToUse,
+        };
+        setEncryptedFiles([encryptedResult]);
         
         // 保存到历史记录
         addEncryptionHistory(result, ticketToUse, files[0].size);
       } else {
-        const results = await encryptFiles(files, ticketToUse);
+        // 多文件加密：每个文件独立ticket
+        const results = await encryptFiles(files);
+        setEncryptedFiles(results);
         
         // 保存到历史记录
         for (let i = 0; i < results.length; i++) {
-          addEncryptionHistory(results[i], ticketToUse, files[i].size);
+          addEncryptionHistory(results[i], results[i].ticket, files[i].size);
         }
         
-        setSuccess(`成功加密 ${files.length} 个文件`);
+        setSuccess(`成功加密 ${files.length} 个文件，每个文件都有独立的ticket`);
       }
-      setSuccess('文件加密成功！');
+      
+      if (files.length === 1) {
+        setSuccess('文件加密成功！');
+      }
     } catch (err) {
       setError('加密失败：' + (err as Error).message);
     } finally {
@@ -108,25 +121,21 @@ export default function Home() {
     setSuccess('');
 
     try {
-      // 这里假设上传的文件是加密数据文件
       const file = files[0];
       const fileContent = await file.text();
       
-      // 尝试解析加密数据格式
       let encryptedData: string;
       let iv: string;
       let fileName: string;
       let fileType: string;
 
       try {
-        // 尝试从文件内容解析JSON格式
         const jsonData = JSON.parse(fileContent);
         encryptedData = jsonData.data;
         iv = jsonData.iv;
         fileName = jsonData.fileName;
         fileType = jsonData.fileType || 'application/octet-stream';
       } catch {
-        // 如果不是JSON格式，直接使用文件内容
         encryptedData = fileContent;
         iv = '';
         fileName = file.name.replace('.encrypted', '');
@@ -155,19 +164,34 @@ export default function Home() {
     }
   };
 
-  const downloadEncryptedFile = () => {
-    if (!encryptedFile) return;
-
-    const content = JSON.stringify(encryptedFile, null, 2);
+  const downloadEncryptedFile = (item: EncryptedFileResult) => {
+    const content = JSON.stringify(
+      {
+        data: item.encryptedData,
+        iv: item.iv,
+        fileName: item.fileName,
+        fileType: item.fileType,
+      },
+      null,
+      2
+    );
     const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${encryptedFile.fileName}.encrypted`;
+    a.download = `${item.fileName}.encrypted`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const downloadAllEncryptedFiles = () => {
+    encryptedFiles.forEach((item, index) => {
+      setTimeout(() => {
+        downloadEncryptedFile(item);
+      }, index * 500);
+    });
   };
 
   const downloadDecryptedFile = () => {
@@ -186,13 +210,36 @@ export default function Home() {
   const reset = () => {
     setFiles([]);
     setTicket('');
-    setEncryptedFile(null);
+    setEncryptedFiles([]);
     setDecryptedFile(null);
     setError('');
     setSuccess('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const getFileTypeLabel = (fileType: string) => {
+    if (fileType.includes('pdf')) return 'PDF文档';
+    if (fileType.includes('word') || fileType.includes('document')) return 'Word文档';
+    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'Excel文档';
+    if (fileType.includes('presentation') || fileType.includes('powerpoint')) return 'PPT文档';
+    if (fileType.includes('image') || fileType.includes('png') || fileType.includes('jpeg') || fileType.includes('jpg')) return '图片';
+    if (fileType.includes('video')) return '视频';
+    if (fileType.includes('audio')) return '音频';
+    if (fileType.includes('text') || fileType.includes('plain')) return '文本';
+    return '文件';
+  };
+
+  const getFileTypeColor = (fileType: string) => {
+    if (fileType.includes('pdf')) return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+    if (fileType.includes('word') || fileType.includes('document')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+    if (fileType.includes('presentation') || fileType.includes('powerpoint')) return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+    if (fileType.includes('image')) return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+    if (fileType.includes('video')) return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300';
+    if (fileType.includes('audio')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   };
 
   return (
@@ -215,7 +262,7 @@ export default function Home() {
       </nav>
 
       {/* 主内容 */}
-      <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="space-y-8">
           {/* 标题 */}
           <div className="text-center">
@@ -223,8 +270,19 @@ export default function Home() {
               安全文件加密
             </h2>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
-              使用ticket保护您的文件安全，只有拥有ticket的人才能解密
+              支持文档、图片、视频、音频等常用文件类型，每个文件独立ticket保护
             </p>
+          </div>
+
+          {/* 支持的文件类型 */}
+          <div className="flex flex-wrap justify-center gap-2 text-xs">
+            <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-red-800 dark:bg-red-900 dark:text-red-300">PDF</span>
+            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Word</span>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-green-800 dark:bg-green-900 dark:text-green-300">Excel</span>
+            <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-orange-800 dark:bg-orange-900 dark:text-orange-300">PPT</span>
+            <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-purple-800 dark:bg-purple-900 dark:text-purple-300">图片</span>
+            <span className="inline-flex items-center rounded-full bg-pink-100 px-2.5 py-0.5 text-pink-800 dark:bg-pink-900 dark:text-pink-300">视频</span>
+            <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">音频</span>
           </div>
 
           {/* 模式切换 */}
@@ -262,7 +320,7 @@ export default function Home() {
             {/* 文件上传 */}
             <div className="mb-6">
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {mode === 'encrypt' ? '选择文件' : '选择加密文件'}
+                {mode === 'encrypt' ? '选择文件（支持多选）' : '选择加密文件'}
               </label>
               <div className="flex items-center gap-4">
                 <input
@@ -280,44 +338,65 @@ export default function Home() {
                 </button>
               </div>
               {files.length > 0 && (
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  已选择 {files.length} 个文件
-                </p>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    已选择 {files.length} 个文件
+                  </p>
+                  {mode === 'encrypt' && files.length > 1 && (
+                    <p className="text-xs text-orange-600 dark:text-orange-400">
+                      批量加密时，每个文件将生成独立的ticket
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Ticket输入 */}
-            <div className="mb-6">
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Ticket（密钥）
-              </label>
-              <div className="flex gap-4">
+            {/* Ticket输入（仅单文件加密时显示） */}
+            {mode === 'encrypt' && files.length === 1 && (
+              <div className="mb-6">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ticket（密钥）
+                </label>
+                <div className="flex gap-4">
+                  <input
+                    type="text"
+                    value={ticket}
+                    onChange={(e) => setTicket(e.target.value)}
+                    placeholder="输入ticket或留空自动生成"
+                    className="flex-1 rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  />
+                  {!ticket && (
+                    <button
+                      onClick={() => setTicket(generateTicket())}
+                      className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    >
+                      生成Ticket
+                    </button>
+                  )}
+                </div>
+                {ticket && (
+                  <p className="mt-2 text-sm text-orange-600 dark:text-orange-400">
+                    ⚠️ 请保存好此ticket，文件解密时需要使用
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Ticket输入（解密模式） */}
+            {mode === 'decrypt' && (
+              <div className="mb-6">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ticket（解密密钥）
+                </label>
                 <input
                   type="text"
                   value={ticket}
                   onChange={(e) => setTicket(e.target.value)}
-                  placeholder={
-                    mode === 'encrypt'
-                      ? '输入ticket或留空自动生成'
-                      : '输入解密ticket'
-                  }
-                  className="flex-1 rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  placeholder="输入解密ticket"
+                  className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 />
-                {mode === 'encrypt' && !ticket && (
-                  <button
-                    onClick={() => setTicket(generateTicket())}
-                    className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  >
-                    生成Ticket
-                  </button>
-                )}
               </div>
-              {ticket && mode === 'encrypt' && (
-                <p className="mt-2 text-sm text-orange-600 dark:text-orange-400">
-                  ⚠️ 请保存好此ticket，文件解密时需要使用
-                </p>
-              )}
-            </div>
+            )}
 
             {/* 操作按钮 */}
             <button
@@ -328,7 +407,9 @@ export default function Home() {
               {loading
                 ? '处理中...'
                 : mode === 'encrypt'
-                ? '加密文件'
+                ? files.length > 1
+                  ? `批量加密 ${files.length} 个文件`
+                  : '加密文件'
                 : '解密文件'}
             </button>
 
@@ -347,20 +428,62 @@ export default function Home() {
             )}
 
             {/* 加密结果 */}
-            {mode === 'encrypt' && encryptedFile && (
-              <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
-                <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">
-                  加密成功
-                </h3>
-                <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                  文件名：{encryptedFile.fileName}
-                </p>
-                <button
-                  onClick={downloadEncryptedFile}
-                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
-                >
-                  下载加密文件
-                </button>
+            {mode === 'encrypt' && encryptedFiles.length > 0 && (
+              <div className="mt-6 space-y-4">
+                {encryptedFiles.length > 1 && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={downloadAllEncryptedFiles}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
+                    >
+                      下载所有加密文件
+                    </button>
+                  </div>
+                )}
+                {encryptedFiles.map((item, index) => (
+                  <div
+                    key={index}
+                    className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900"
+                  >
+                    <div className="mb-3 flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {item.fileName}
+                          </h3>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
+                            {getFileTypeLabel(item.fileType)}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => downloadEncryptedFile(item)}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
+                      >
+                        下载
+                      </button>
+                    </div>
+                    <div className="rounded-lg bg-white p-3 dark:bg-gray-800">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          Ticket（解密密钥）
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(item.ticket);
+                            alert('Ticket已复制到剪贴板');
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          复制
+                        </button>
+                      </div>
+                      <code className="block break-all rounded bg-gray-100 p-2 text-xs text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                        {item.ticket}
+                      </code>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -370,9 +493,14 @@ export default function Home() {
                 <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">
                   解密成功
                 </h3>
-                <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                  文件名：{decryptedFile.fileName}
-                </p>
+                <div className="mb-3 flex items-center gap-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    文件名：{decryptedFile.fileName}
+                  </p>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(decryptedFile.fileType)}`}>
+                    {getFileTypeLabel(decryptedFile.fileType)}
+                  </span>
+                </div>
                 <button
                   onClick={downloadDecryptedFile}
                   className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
@@ -389,11 +517,10 @@ export default function Home() {
               使用说明
             </h3>
             <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-              <li>
-                • 支持单个或批量文件加密，所有文件使用同一个ticket
-              </li>
-              <li>• 加密后的文件会保存为.json格式的加密文件</li>
-              <li>• 解密时需要使用加密时的ticket</li>
+              <li>• 支持PDF、Word、Excel、PPT、图片、视频、音频等常用文件类型</li>
+              <li>• 批量加密时，每个文件会生成独立的ticket，更安全</li>
+              <li>• 加密后的文件保存为.json格式的加密文件</li>
+              <li>• 解密时需要使用对应文件的ticket</li>
               <li>• 所有加密历史记录保存在个人中心</li>
               <li>• 请妥善保管ticket，丢失后无法解密文件</li>
             </ul>

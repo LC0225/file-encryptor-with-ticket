@@ -71,6 +71,39 @@ export default function Profile() {
     }
   };
 
+  const getFileTypeLabel = (fileType: string) => {
+    if (!fileType) return '未知类型';
+    if (fileType.includes('pdf')) return 'PDF';
+    if (fileType.includes('word') || fileType.includes('document')) return 'Word';
+    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'Excel';
+    if (fileType.includes('presentation') || fileType.includes('powerpoint')) return 'PPT';
+    if (fileType.includes('image') || fileType.includes('png') || fileType.includes('jpeg') || fileType.includes('jpg')) return '图片';
+    if (fileType.includes('video')) return '视频';
+    if (fileType.includes('audio')) return '音频';
+    if (fileType.includes('text') || fileType.includes('plain')) return '文本';
+    return '其他';
+  };
+
+  const getFileTypeColor = (fileType: string) => {
+    if (!fileType) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    if (fileType.includes('pdf')) return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+    if (fileType.includes('word') || fileType.includes('document')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+    if (fileType.includes('presentation') || fileType.includes('powerpoint')) return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+    if (fileType.includes('image')) return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+    if (fileType.includes('video')) return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300';
+    if (fileType.includes('audio')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+  };
+
+  const downloadAllEncryptedFiles = () => {
+    history.forEach((item, index) => {
+      setTimeout(() => {
+        handleDownloadEncryptedFile(item);
+      }, index * 500);
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {/* 导航栏 */}
@@ -100,17 +133,27 @@ export default function Profile() {
                 加密历史
               </h2>
               <p className="mt-2 text-gray-600 dark:text-gray-400">
-                管理您的加密文件历史记录
+                管理您的加密文件历史记录，每个文件都有独立的ticket
               </p>
             </div>
-            {history.length > 0 && (
-              <button
-                onClick={handleClearAll}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-700"
-              >
-                清空所有记录
-              </button>
-            )}
+            <div className="flex gap-3">
+              {history.length > 1 && (
+                <button
+                  onClick={downloadAllEncryptedFiles}
+                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
+                >
+                  下载所有文件
+                </button>
+              )}
+              {history.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-700"
+                >
+                  清空所有记录
+                </button>
+              )}
+            </div>
           </div>
 
           {/* 统计信息 */}
@@ -185,12 +228,12 @@ export default function Profile() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                           {item.fileName}
                         </h3>
-                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                          {item.fileType || 'Unknown'}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
+                          {getFileTypeLabel(item.fileType)}
                         </span>
                       </div>
                       <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
@@ -201,6 +244,7 @@ export default function Profile() {
                     <button
                       onClick={() => handleDelete(item.id)}
                       className="ml-4 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                      title="删除记录"
                     >
                       <svg
                         className="h-5 w-5"
@@ -237,7 +281,7 @@ export default function Profile() {
                   </div>
 
                   {/* 操作按钮 */}
-                  <div className="mt-4 flex gap-3">
+                  <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       onClick={() => handleDownloadEncryptedFile(item)}
                       className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
@@ -259,9 +303,7 @@ export default function Profile() {
                     </button>
                     <button
                       onClick={() => {
-                        // 保存ticket到session storage
                         sessionStorage.setItem('decrypt_ticket', item.ticket);
-                        // 跳转到首页
                         window.location.href = '/';
                       }}
                       className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
