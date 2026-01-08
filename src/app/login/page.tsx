@@ -114,13 +114,6 @@ export default function Login() {
             </Link>
           </div>
         </div>
-
-        {/* 提示信息 */}
-        <div className="mt-6 rounded-lg bg-blue-50 p-4 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-          <div className="font-medium mb-1">管理员账号</div>
-          <div>用户名: root</div>
-          <div>密码: BGSN123.321</div>
-        </div>
       </div>
     </div>
   );
