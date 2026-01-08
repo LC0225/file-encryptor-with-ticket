@@ -50,8 +50,9 @@ export async function POST(request: NextRequest) {
 
     // 创建会话token（简单使用用户ID和base64编码）
     const sessionData = {
-      userId: user.id,
+      id: user.id,
       username: user.username,
+      email: user.email,
       role: user.role,
       loginTime: new Date().toISOString(),
     };
