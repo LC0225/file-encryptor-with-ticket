@@ -43,27 +43,39 @@ export default function Profile() {
   const [syncMessageType, setSyncMessageType] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
-    // 登录检查
-    if (!isLoggedIn()) {
-      router.push('/login');
-      return;
-    }
+    const init = async () => {
+      try {
+        // 登录检查
+        if (!isLoggedIn()) {
+          router.replace('/login');
+          return;
+        }
 
-    // 加载用户信息
-    const loadUser = async () => {
-      const user = await getCurrentUser();
-      setCurrentUser(user);
+        // 加载用户信息（带错误处理）
+        try {
+          const user = await getCurrentUser();
+          setCurrentUser(user);
+        } catch (error) {
+          console.error('加载用户信息失败:', error);
+          router.replace('/login');
+          return;
+        }
+
+        loadHistory();
+
+        // 初始化同步状态（不阻塞）
+        initSyncStatus().then(() => {
+          setSyncStatus(getSyncStatus());
+        }).catch(error => {
+          console.error('初始化同步状态失败:', error);
+        });
+      } catch (error) {
+        console.error('初始化个人中心失败:', error);
+        router.replace('/login');
+      }
     };
-    loadUser();
 
-    loadHistory();
-
-    // 初始化同步状态
-    const initSync = async () => {
-      await initSyncStatus();
-      setSyncStatus(getSyncStatus());
-    };
-    initSync();
+    init();
   }, [router]);
 
   const loadHistory = () => {

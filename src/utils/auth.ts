@@ -134,37 +134,49 @@ export function logoutUser(): void {
 export async function getCurrentUser(): Promise<User | null> {
   if (typeof window === 'undefined') return null;
 
-  if (canUseDatabase()) {
-    try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) return null;
+  try {
+    if (canUseDatabase()) {
+      try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) return null;
 
-      const response = await fetch('/api/auth/user', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+        // 添加超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3秒超时
 
-      if (response.status === 401) {
-        // Token无效，清除本地存储
-        localStorage.removeItem(TOKEN_KEY);
+        const response = await fetch('/api/auth/user', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.status === 401) {
+          // Token无效，清除本地存储
+          localStorage.removeItem(TOKEN_KEY);
+          return null;
+        }
+
+        const data = await response.json();
+        if (data.success) {
+          return data.user;
+        }
+
         return null;
+      } catch (error) {
+        console.error('获取当前用户失败（数据库），回退到localStorage:', error);
+        // 如果数据库失败，回退到localStorage
       }
-
-      const data = await response.json();
-      if (data.success) {
-        return data.user;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('获取当前用户失败（数据库），回退到localStorage:', error);
-      // 如果数据库失败，回退到localStorage
     }
+
+    // 使用localStorage方案
+    return await authLocalStorage.getCurrentUser();
+  } catch (error) {
+    console.error('获取当前用户失败:', error);
+    return null;
   }
-  
-  // 使用localStorage方案
-  return authLocalStorage.getCurrentUser();
 }
 
 /**
@@ -194,10 +206,15 @@ export function isAdmin(): boolean {
  * 检查是否已登录
  */
 export function isLoggedIn(): boolean {
-  if (typeof window === 'undefined') return false;
-  
-  // 检查token或localStorage会话
-  return !!localStorage.getItem(TOKEN_KEY) || authLocalStorage.isLoggedIn();
+  try {
+    if (typeof window === 'undefined') return false;
+
+    // 检查token或localStorage会话
+    return !!localStorage.getItem(TOKEN_KEY) || authLocalStorage.isLoggedIn();
+  } catch (error) {
+    console.error('检查登录状态失败:', error);
+    return false;
+  }
 }
 
 /**

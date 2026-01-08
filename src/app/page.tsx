@@ -36,23 +36,42 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isInitializing, setIsInitializing] = useState(true); // 初始化状态
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
 
-  // 加载用户信息
+  // 登录检查（优先执行，避免不必要的加载）
   useEffect(() => {
-    const loadUser = async () => {
-      const user = await getCurrentUser();
-      setCurrentUser(user);
+    const checkAuth = () => {
+      try {
+        if (!isLoggedIn()) {
+          // 使用 replace 避免添加到历史记录
+          router.replace('/login');
+        } else {
+          // 已登录，加载用户信息
+          getCurrentUser().then(user => {
+            setCurrentUser(user);
+            setIsInitializing(false);
+          }).catch(error => {
+            console.error('加载用户信息失败:', error);
+            // 如果加载失败，跳转到登录页
+            router.replace('/login');
+          });
+        }
+      } catch (error) {
+        console.error('登录检查失败:', error);
+        router.replace('/login');
+      }
     };
-    loadUser();
-  }, []);
 
-  // 登录检查
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      router.push('/login');
-    }
+    // 使用 requestAnimationFrame 确保 DOM 已加载
+    const timer = requestAnimationFrame(() => {
+      checkAuth();
+    });
+
+    return () => {
+      cancelAnimationFrame(timer);
+    };
   }, [router]);
 
   // 从session storage读取ticket
@@ -263,6 +282,18 @@ export default function Home() {
     if (fileType.includes('audio')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
     return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   };
+
+  // 显示加载状态
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
