@@ -79,6 +79,8 @@ export interface SyncResult {
   downloaded?: boolean;
   uploaded?: boolean;
   conflict?: boolean;
+  cloudData?: AppData;
+  cloudExists?: boolean;
 }
 
 /**

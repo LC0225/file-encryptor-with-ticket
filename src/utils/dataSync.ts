@@ -1,6 +1,5 @@
 import { User } from './authLocalStorage';
 import { EncryptionHistory } from '@/types';
-import { uploadAppData, downloadAppData, checkCloudDataExists } from './s3Storage';
 import type { AppData, SyncResult, SyncStatus } from '@/types';
 
 // 同步状态（存储在 localStorage）
@@ -94,24 +93,36 @@ export async function syncFromCloud(): Promise<SyncResult> {
   try {
     updateSyncStatus({ syncing: true });
 
-    // 检查云端数据是否存在
-    const cloudExists = await checkCloudDataExists();
-    updateSyncStatus({ cloudExists });
+    // 通过 API 下载云端数据
+    const response = await fetch('/api/cloud-sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'download' }),
+    });
 
-    if (!cloudExists) {
+    if (!response.ok) {
+      const error = await response.json();
       return {
-        success: true,
-        message: '云端暂无数据，将使用本地数据',
+        success: false,
+        message: error.message || '下载云端数据失败',
       };
     }
 
-    // 下载云端数据
-    const cloudData = await downloadAppData();
+    const result: SyncResult = await response.json();
 
-    if (!cloudData) {
+    if (!result.success) {
+      return result;
+    }
+
+    // 检查云端数据是否存在
+    updateSyncStatus({ cloudExists: result.cloudExists || false });
+
+    if (!result.downloaded || !result.cloudData) {
       return {
-        success: false,
-        message: '下载云端数据失败',
+        success: true,
+        message: result.message || '云端暂无数据，将使用本地数据',
       };
     }
 
@@ -120,13 +131,13 @@ export async function syncFromCloud(): Promise<SyncResult> {
     const localVersion = syncStatus.lastSyncTime || 0;
 
     // 比较版本，云端更新则使用云端数据
-    if (cloudData.version > localVersion) {
-      applyCloudDataToLocal(cloudData);
-      updateSyncStatus({ lastSyncTime: cloudData.version });
+    if (result.cloudData.version > localVersion) {
+      applyCloudDataToLocal(result.cloudData);
+      updateSyncStatus({ lastSyncTime: result.cloudData.version });
 
       return {
         success: true,
-        message: `已从云端同步 ${cloudData.users.length} 个用户和 ${cloudData.history.length} 条加密记录`,
+        message: result.message || '从云端同步成功',
         downloaded: true,
       };
     } else {
@@ -158,20 +169,34 @@ export async function syncToCloud(): Promise<SyncResult> {
     // 获取本地数据
     const localData = getLocalData();
 
-    // 上传到云端
-    await uploadAppData(localData);
-
-    // 更新同步状态
-    updateSyncStatus({
-      lastSyncTime: localData.version,
-      cloudExists: true,
+    // 通过 API 上传到云端
+    const response = await fetch('/api/cloud-sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'upload', localData }),
     });
 
-    return {
-      success: true,
-      message: `已上传 ${localData.users.length} 个用户和 ${localData.history.length} 条加密记录到云端`,
-      uploaded: true,
-    };
+    if (!response.ok) {
+      const error = await response.json();
+      return {
+        success: false,
+        message: error.message || '上传云端失败',
+      };
+    }
+
+    const result: SyncResult = await response.json();
+
+    if (result.success) {
+      // 更新同步状态
+      updateSyncStatus({
+        lastSyncTime: localData.version,
+        cloudExists: true,
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error('上传云端失败:', error);
     return {
@@ -230,8 +255,21 @@ export async function fullSync(): Promise<SyncResult> {
  */
 export async function checkCloudStatus(): Promise<void> {
   try {
-    const cloudExists = await checkCloudDataExists();
-    updateSyncStatus({ cloudExists });
+    // 通过 API 检查云端数据状态
+    const response = await fetch('/api/cloud-sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'check' }),
+    });
+
+    if (response.ok) {
+      const result: SyncResult = await response.json();
+      if (result.success && result.cloudExists !== undefined) {
+        updateSyncStatus({ cloudExists: result.cloudExists });
+      }
+    }
   } catch (error) {
     console.error('检查云端状态失败:', error);
   }

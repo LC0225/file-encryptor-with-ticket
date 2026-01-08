@@ -1,4 +1,3 @@
-import { Buffer } from 'buffer';
 import { syncToCloud, syncFromCloud } from './dataSync';
 import type { User as UserType } from '@/types';
 
@@ -27,13 +26,25 @@ export function validatePassword(password: string): { valid: boolean; message: s
 }
 
 /**
+ * 将 ArrayBuffer 转换为十六进制字符串（浏览器兼容）
+ */
+function arrayBufferToHex(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+/**
  * 密码加密（使用SHA-256）
  */
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hash = await crypto.subtle.digest('SHA-256', data);
-  return Buffer.from(hash).toString('hex');
+  return arrayBufferToHex(hash);
 }
 
 /**

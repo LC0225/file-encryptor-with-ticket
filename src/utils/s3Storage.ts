@@ -1,10 +1,10 @@
 import { S3Storage } from "coze-coding-dev-sdk";
 
-// 对象存储实例
+// 对象存储实例（仅在服务器端使用）
 let storageInstance: S3Storage | null = null;
 
 /**
- * 获取对象存储实例（单例模式）
+ * 获取对象存储实例（单例模式，仅服务器端使用）
  */
 export function getS3Storage(): S3Storage {
   if (!storageInstance) {
@@ -27,6 +27,8 @@ export function getS3Storage(): S3Storage {
 export async function uploadAppData(data: any): Promise<string> {
   const storage = getS3Storage();
   const jsonContent = JSON.stringify(data, null, 2);
+
+  // 在服务器端环境，使用 Buffer
   const buffer = Buffer.from(jsonContent, 'utf-8');
 
   const fileKey = await storage.uploadFile({
@@ -55,7 +57,10 @@ export async function downloadAppData(): Promise<any | null> {
 
     // 读取文件内容
     const buffer = await storage.readFile({ fileKey });
-    const jsonContent = buffer.toString('utf-8');
+
+    // 使用 TextDecoder 解码（浏览器兼容）
+    const decoder = new TextDecoder();
+    const jsonContent = decoder.decode(buffer);
     const data = JSON.parse(jsonContent);
 
     return data;
