@@ -3,5 +3,5 @@
   "devCommand": "yarn dev",
   "installCommand": "yarn install",
   "framework": "nextjs",
-  "regions": ["hkg1"]
+  "outputDirectory": "out"
 }
