@@ -17,7 +17,7 @@ export default function Profile() {
   const [history, setHistory] = useState<ReturnType<typeof getEncryptionHistory>>([]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState(getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
 
   useEffect(() => {
     // 登录检查
@@ -25,6 +25,14 @@ export default function Profile() {
       router.push('/login');
       return;
     }
+
+    // 加载用户信息
+    const loadUser = async () => {
+      const user = await getCurrentUser();
+      setCurrentUser(user);
+    };
+    loadUser();
+
     loadHistory();
   }, [router]);
 

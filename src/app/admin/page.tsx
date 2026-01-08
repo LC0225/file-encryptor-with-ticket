@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { isAdmin, getAllUsers, deleteUser, logoutUser } from '@/utils/auth';
+import type { User } from '@/utils/auth';
 
 export default function Admin() {
   const router = useRouter();
-  const [users, setUsers] = useState<ReturnType<typeof getAllUsers>>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -22,8 +23,9 @@ export default function Admin() {
     loadUsers();
   }, [router]);
 
-  const loadUsers = () => {
-    setUsers(getAllUsers());
+  const loadUsers = async () => {
+    const usersList = await getAllUsers();
+    setUsers(usersList);
     setLoading(false);
   };
 
@@ -32,9 +34,9 @@ export default function Admin() {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedUser) {
-      const result = deleteUser(selectedUser);
+      const result = await deleteUser(selectedUser);
       if (result.success) {
         loadUsers();
       } else {
@@ -182,13 +184,13 @@ export default function Admin() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                          {new Date(user.createdAt).toLocaleString('zh-CN', {
+                          {user.createdAt ? new Date(user.createdAt).toLocaleString('zh-CN', {
                             year: 'numeric',
                             month: '2-digit',
                             day: '2-digit',
                             hour: '2-digit',
                             minute: '2-digit',
-                          })}
+                          }) : '-'}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-right">
                           {user.role !== 'admin' && (
