@@ -135,14 +135,25 @@ export async function getCurrentUser(): Promise<User | null> {
   if (typeof window === 'undefined') return null;
 
   try {
+    // 优先检查localStorage，快速返回
+    try {
+      const localUser = await authLocalStorage.getCurrentUser();
+      if (localUser) {
+        return localUser;
+      }
+    } catch (error) {
+      console.log('localStorage读取失败，尝试API');
+    }
+
+    // 如果localStorage没有数据，才尝试API
     if (canUseDatabase()) {
       try {
         const token = localStorage.getItem(TOKEN_KEY);
         if (!token) return null;
 
-        // 添加超时控制
+        // 添加超时控制 - 缩短到1秒，快速回退
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 1000); // 1秒超时
 
         const response = await fetch('/api/auth/user', {
           headers: {
@@ -166,7 +177,7 @@ export async function getCurrentUser(): Promise<User | null> {
 
         return null;
       } catch (error) {
-        console.error('获取当前用户失败（数据库），回退到localStorage:', error);
+        console.log('API请求超时或失败，回退到localStorage');
         // 如果数据库失败，回退到localStorage
       }
     }

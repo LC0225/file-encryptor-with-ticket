@@ -51,16 +51,27 @@ export default function Profile() {
           return;
         }
 
-        // 加载用户信息（带错误处理）
+        // 先从localStorage快速加载用户信息
         try {
-          const user = await getCurrentUser();
-          setCurrentUser(user);
+          const authLocalStorage = await import('@/utils/authLocalStorage');
+          const localUser = await authLocalStorage.getCurrentUser();
+          if (localUser) {
+            setCurrentUser(localUser);
+          }
         } catch (error) {
-          console.error('加载用户信息失败:', error);
-          router.replace('/login');
-          return;
+          console.log('从localStorage读取用户失败');
         }
 
+        // 异步获取用户信息，不阻塞页面
+        getCurrentUser().then(user => {
+          if (user) {
+            setCurrentUser(user);
+          }
+        }).catch(error => {
+          console.error('加载用户信息失败:', error);
+        });
+
+        // 加载历史记录
         loadHistory();
 
         // 初始化同步状态（不阻塞）
@@ -85,9 +96,9 @@ export default function Profile() {
   const handleCopyTicket = async (ticket: string) => {
     const success = await copyToClipboard(ticket);
     if (success) {
-      showToast({ type: 'success', message: 'Ticket已复制到剪贴板', duration: 2000 });
+      showToast('Ticket已复制到剪贴板', 'success');
     } else {
-      showToast({ type: 'error', message: '复制失败，请手动复制', duration: 3000 });
+      showToast('复制失败，请手动复制', 'error');
     }
   };
 

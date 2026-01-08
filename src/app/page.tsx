@@ -40,38 +40,55 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
 
-  // 登录检查（优先执行，避免不必要的加载）
+  // 登录检查（优先执行，快速从localStorage读取）
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
+        // 首先检查是否已登录
         if (!isLoggedIn()) {
-          // 使用 replace 避免添加到历史记录
           router.replace('/login');
-        } else {
-          // 已登录，加载用户信息
-          getCurrentUser().then(user => {
-            setCurrentUser(user);
+          return;
+        }
+
+        // 先尝试从localStorage快速读取用户信息（避免API超时）
+        try {
+          // 直接导入并调用authLocalStorage的getCurrentUser
+          const authLocalStorage = await import('@/utils/authLocalStorage');
+          const localUser = await authLocalStorage.getCurrentUser();
+          if (localUser) {
+            setCurrentUser(localUser);
             setIsInitializing(false);
-          }).catch(error => {
-            console.error('加载用户信息失败:', error);
-            // 如果加载失败，跳转到登录页
-            router.replace('/login');
-          });
+            // 后台尝试同步，但不阻塞页面
+            getCurrentUser().then(apiUser => {
+              if (apiUser) {
+                setCurrentUser(apiUser);
+              }
+            }).catch(err => {
+              console.log('后台同步用户信息失败，使用本地数据');
+            });
+            return;
+          }
+        } catch (error) {
+          console.log('从localStorage读取用户失败，尝试API');
+        }
+
+        // 只有在本地没有数据时才调用API
+        const user = await getCurrentUser();
+        if (user) {
+          setCurrentUser(user);
+          setIsInitializing(false);
+        } else {
+          router.replace('/login');
         }
       } catch (error) {
         console.error('登录检查失败:', error);
+        // 出错时直接跳转到登录页，避免阻塞
         router.replace('/login');
       }
     };
 
-    // 使用 requestAnimationFrame 确保 DOM 已加载
-    const timer = requestAnimationFrame(() => {
-      checkAuth();
-    });
-
-    return () => {
-      cancelAnimationFrame(timer);
-    };
+    // 立即执行，不等待requestAnimationFrame
+    checkAuth();
   }, [router]);
 
   // 从session storage读取ticket
@@ -559,7 +576,7 @@ export default function Home() {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(item.ticket);
-                            showToast({ type: 'success', message: 'Ticket已复制到剪贴板', duration: 2000 });
+                            showToast('Ticket已复制到剪贴板', 'success');
                           }}
                           className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                         >
