@@ -11,6 +11,7 @@ import {
 } from '@/utils/crypto';
 import { addEncryptionHistory } from '@/utils/storage';
 import { getCurrentUser, logoutUser, isLoggedIn } from '@/utils/auth';
+import { useToast } from '@/components/ToastContext';
 
 interface EncryptedFileResult {
   encryptedData: string;
@@ -22,6 +23,7 @@ interface EncryptedFileResult {
 
 export default function Home() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
   const [ticket, setTicket] = useState('');
   const [mode, setMode] = useState<'encrypt' | 'decrypt'>('encrypt');
@@ -526,7 +528,7 @@ export default function Home() {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(item.ticket);
-                            alert('Ticket已复制到剪贴板');
+                            showToast({ type: 'success', message: 'Ticket已复制到剪贴板', duration: 2000 });
                           }}
                           className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                         >

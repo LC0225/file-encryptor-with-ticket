@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { isAdmin, getAllUsers, deleteUser, logoutUser } from '@/utils/auth';
 import type { User } from '@/utils/auth';
+import { useToast } from '@/components/ToastContext';
 
 export default function Admin() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -39,8 +41,9 @@ export default function Admin() {
       const result = await deleteUser(selectedUser);
       if (result.success) {
         loadUsers();
+        showToast({ type: 'success', message: '用户删除成功', duration: 2000 });
       } else {
-        alert(result.message);
+        showToast({ type: 'error', message: result.message, duration: 3000 });
       }
     }
     setShowDeleteModal(false);

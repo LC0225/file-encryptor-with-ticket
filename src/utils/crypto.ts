@@ -1,5 +1,3 @@
-import { Buffer } from 'buffer';
-
 export interface EncryptionResult {
   encryptedData: string;
   iv: string;
@@ -11,6 +9,31 @@ export interface DecryptionResult {
   decryptedData: Blob;
   fileName: string;
   fileType: string;
+}
+
+/**
+ * 将Uint8Array转换为base64字符串
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * 将base64字符串转换为Uint8Array
+ */
+function base64ToArrayBuffer(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /**
@@ -67,8 +90,8 @@ export async function encryptFile(file: File, ticket: string): Promise<Encryptio
   );
 
   return {
-    encryptedData: Buffer.from(encryptedData).toString('base64'),
-    iv: Buffer.from(iv).toString('base64'),
+    encryptedData: arrayBufferToBase64(encryptedData),
+    iv: arrayBufferToBase64(iv.buffer),
     fileName: file.name,
     fileType: file.type,
   };
@@ -85,8 +108,8 @@ export async function decryptFile(
   originalFileType: string
 ): Promise<DecryptionResult> {
   const key = await deriveKey(ticket);
-  const encryptedBuffer = Buffer.from(encryptedData, 'base64');
-  const ivBuffer = Buffer.from(iv, 'base64');
+  const encryptedBuffer = base64ToArrayBuffer(encryptedData) as BufferSource;
+  const ivBuffer = base64ToArrayBuffer(iv) as BufferSource;
 
   try {
     const decryptedData = await crypto.subtle.decrypt(
