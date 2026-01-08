@@ -198,6 +198,23 @@ export function getAuthToken(): string | null {
 }
 
 /**
+ * 从token获取用户信息（服务器端使用）
+ */
+export async function getCurrentUserFromToken(token: string): Promise<User | null> {
+  try {
+    const sessionData = JSON.parse(Buffer.from(token, 'base64').toString());
+    return {
+      id: sessionData.userId,
+      username: sessionData.username,
+      role: sessionData.role,
+    };
+  } catch (error) {
+    console.error('解析token失败:', error);
+    return null;
+  }
+}
+
+/**
  * 获取所有用户（仅管理员）
  */
 export async function getAllUsers(): Promise<User[]> {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userManager } from '@/storage/database/userManager';
 import { uploadAppData, downloadAppData, checkCloudDataExists } from '@/utils/supabaseStorage';
-import type { AppData, SyncResult } from '@/types';
+import type { AppData, SyncResult, User } from '@/types';
 
 /**
  * GET /api/cloud-sync/users
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       id: user.id,
       username: user.username,
       passwordHash: user.passwordHash,
-      email: user.email,
+      email: user.email || undefined,
       role: user.role,
       createdAt: user.createdAt,
     }));
@@ -75,14 +75,23 @@ export async function POST(request: NextRequest) {
 
     // 合并用户数据（去重：以用户名为准）
     const mergedUsers = [...cloudData.users];
-    cloudUsers.forEach(dbUser => {
+    dbUsers.forEach(dbUser => {
+      const cloudUser: User = {
+        id: dbUser.id,
+        username: dbUser.username,
+        passwordHash: dbUser.passwordHash,
+        email: dbUser.email || undefined,
+        role: dbUser.role as 'admin' | 'user',
+        createdAt: dbUser.createdAt.toISOString(),
+      };
+
       const existingIndex = mergedUsers.findIndex(u => u.username === dbUser.username);
       if (existingIndex >= 0) {
         // 更新已存在的用户
-        mergedUsers[existingIndex] = dbUser;
+        mergedUsers[existingIndex] = cloudUser;
       } else {
         // 添加新用户
-        mergedUsers.push(dbUser);
+        mergedUsers.push(cloudUser);
       }
     });
 
