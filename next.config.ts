@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 配置图片优化
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;

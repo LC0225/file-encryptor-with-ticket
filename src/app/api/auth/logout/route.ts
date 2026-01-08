@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// 静态导出配置
+
 export async function POST(request: NextRequest) {
   try {
     // 登出主要在前端清除token，这里返回成功即可

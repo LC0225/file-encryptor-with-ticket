@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userManager } from '@/storage/database/userManager';
 import { Buffer } from 'buffer';
 
+// 静态导出配置
+
 // 验证token并获取用户信息
 function verifyToken(token: string): { userId: string; username: string; role: string } | null {
   try {

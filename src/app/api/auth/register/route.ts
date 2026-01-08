@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userManager } from '@/storage/database/userManager';
 import { Buffer } from 'buffer';
 
+// 静态导出配置
+
 // 密码要求检查
 function validatePassword(password: string): { valid: boolean; message: string } {
   if (password.length < 8) {

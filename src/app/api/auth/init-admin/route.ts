@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userManager } from '@/storage/database/userManager';
 import { Buffer } from 'buffer';
 
+// 静态导出配置
+
 // 密码加密（使用SHA-256）
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
