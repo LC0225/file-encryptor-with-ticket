@@ -55,6 +55,7 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
   const [algorithm, setAlgorithm] = useState<'AES-GCM' | 'AES-CBC'>('AES-GCM');
   const [isMounted, setIsMounted] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const [encryptionProgress, setEncryptionProgress] = useState({
     progress: 0,
     currentChunk: 0,
@@ -86,6 +87,9 @@ export default function Home() {
     const loadUser = async () => {
       const user = await getCurrentUser();
       setCurrentUser(user);
+      if (user) {
+        setIsAdminUser(user.role === 'admin');
+      }
     };
     loadUser();
   }, []);
@@ -1127,7 +1131,7 @@ export default function Home() {
               文件加密工具
             </h1>
             <div className="flex items-center gap-2 sm:gap-4">
-              {isMounted && isAdmin() && (
+              {isMounted && isAdminUser && (
                 <Link
                   href="/admin"
                   className="rounded-lg px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"

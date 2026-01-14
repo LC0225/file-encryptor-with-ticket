@@ -39,7 +39,7 @@ export interface EncryptedFileResult {
 export interface User {
   id: string;
   username: string;
-  passwordHash: string;
+  passwordHash?: string; // 可选，返回用户信息时不包含密码哈希
   email?: string;
   createdAt: string;
   role: 'admin' | 'user';

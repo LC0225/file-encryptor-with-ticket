@@ -194,6 +194,10 @@ export async function loginUser(
     return { success: false, message: '用户名或密码错误' };
   }
 
+  if (!user.passwordHash) {
+    return { success: false, message: '用户数据不完整，无法登录' };
+  }
+
   const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
     return { success: false, message: '用户名或密码错误' };
@@ -224,7 +228,7 @@ export function logoutUser(): void {
 /**
  * 获取当前登录用户
  */
-export function getCurrentUser(): any | null {
+export function getCurrentUser(): UserType | null {
   if (typeof window === 'undefined') return null;
   try {
     console.log('🔍 [authLocalStorage] 开始获取当前用户');

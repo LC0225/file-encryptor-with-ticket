@@ -203,7 +203,32 @@ export async function getCurrentUser(): Promise<User | null> {
     const tokenData = JSON.parse(atob(token));
     if (tokenData && tokenData.id && tokenData.username) {
       console.log('🔧 从旧token恢复session:', tokenData.username);
-      
+
+      // 检查用户是否已在localStorage中存在
+      const usersKey = 'crypto_users';
+      const usersData = localStorage.getItem(usersKey);
+      const users = usersData ? JSON.parse(usersData) : [];
+      const existingUser = users.find((u: any) => u.id === tokenData.id);
+
+      if (!existingUser) {
+        console.log('🔧 用户不在localStorage中，从token添加用户信息');
+        // 将token中的用户信息添加到localStorage（仅添加基本信息，无密码）
+        // 注意：这样会导致用户无法通过密码登录，但至少可以保持session
+        const newUser = {
+          id: tokenData.id,
+          username: tokenData.username,
+          email: tokenData.email,
+          role: tokenData.role || 'user',
+          createdAt: tokenData.createdAt,
+          passwordHash: '', // 空密码哈希，表示需要重新设置密码
+        };
+        users.push(newUser);
+        localStorage.setItem(usersKey, JSON.stringify(users));
+        console.log('✅ 已将用户添加到localStorage:', tokenData.username);
+      } else {
+        console.log('✅ 用户已在localStorage中:', tokenData.username);
+      }
+
       // 保存session到localStorage
       const session = {
         userId: tokenData.id,
@@ -212,16 +237,16 @@ export async function getCurrentUser(): Promise<User | null> {
         loginTime: tokenData.loginTime || new Date().toISOString(),
       };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      
-      // 尝试从localStorage获取完整用户信息
+
+      // 再次尝试从localStorage获取完整用户信息
       const userFromSession = authLocalStorage.getCurrentUser();
       if (userFromSession) {
         console.log('✅ 从token恢复session并获取到用户:', userFromSession.username);
         return userFromSession;
       }
-      
-      // 如果localStorage用户列表为空，直接返回token中的用户信息
-      console.log('🔧 localStorage用户列表为空，直接使用token中的用户信息');
+
+      // 如果仍然失败，直接返回token中的用户信息
+      console.log('🔧 直接返回token中的用户信息');
       return {
         id: tokenData.id,
         username: tokenData.username,
@@ -278,6 +303,27 @@ export async function getCurrentUser(): Promise<User | null> {
 
   // 使用localStorage方案
   return authLocalStorage.getCurrentUser();
+}
+
+/**
+ * 从token获取用户信息（用于API路由）
+ */
+export function getCurrentUserFromToken(token: string): User | null {
+  try {
+    const tokenData = JSON.parse(atob(token));
+    if (tokenData && tokenData.id && tokenData.username) {
+      return {
+        id: tokenData.id,
+        username: tokenData.username,
+        email: tokenData.email,
+        role: tokenData.role || 'user',
+        createdAt: tokenData.createdAt,
+      };
+    }
+  } catch (error) {
+    console.error('从token解析用户信息失败:', error);
+  }
+  return null;
 }
 
 /**

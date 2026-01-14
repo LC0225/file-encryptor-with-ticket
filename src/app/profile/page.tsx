@@ -34,6 +34,7 @@ export default function Profile() {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     enabled: true,
     lastSyncTime: null,
@@ -61,6 +62,9 @@ export default function Profile() {
     const loadUser = async () => {
       const user = await getCurrentUser();
       setCurrentUser(user);
+      if (user) {
+        setIsAdminUser(user.role === 'admin');
+      }
     };
     loadUser();
 
@@ -201,7 +205,7 @@ export default function Profile() {
               </span>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              {isMounted && isAdmin() && (
+              {isMounted && isAdminUser && (
                 <Link
                   href="/admin"
                   className="rounded-lg px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
