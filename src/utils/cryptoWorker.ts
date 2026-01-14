@@ -130,6 +130,7 @@ self.addEventListener('message', async (e) => {
 
       let encryptedData;
       let iv;
+      let chunkCount = 1; // 默认为1，用于AES-GCM
 
       if (algorithm === 'AES-GCM') {
         // AES-GCM：直接加密整个文件，不分块
@@ -143,27 +144,65 @@ self.addEventListener('message', async (e) => {
           fileData
         );
         encryptedData = new Uint8Array(encryptedData);
+        chunkCount = 1; // AES-GCM不分块
 
         self.postMessage({
           type: 'PROGRESS',
           data: { progress: 100, currentChunk: 1, totalChunks: 1 }
         });
       } else {
-        // AES-CBC：直接加密整个文件，不分块
-        // 与AES-GCM保持一致，避免IV管理复杂性
-        const key = await deriveKeyCBC(ticket);
-        iv = crypto.getRandomValues(new Uint8Array(16)); // CBC使用16字节IV
-        encryptedData = await crypto.subtle.encrypt(
-          { name: 'AES-CBC', iv: iv },
-          key,
-          fileData
-        );
-        encryptedData = new Uint8Array(encryptedData);
+        // AES-CBC：分块加密，使用CBC链式特性
+        // 每块使用前一块密文的最后16字节作为IV，第一个块使用随机IV
+        const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+        const totalChunks = Math.ceil(fileData.byteLength / CHUNK_SIZE);
+        const encryptedChunks = [];
 
-        self.postMessage({
-          type: 'PROGRESS',
-          data: { progress: 100, currentChunk: 1, totalChunks: 1 }
-        });
+        // 生成初始IV并保存
+        const initialIV = crypto.getRandomValues(new Uint8Array(16));
+        let currentIV = new Uint8Array(initialIV);
+        const key = await deriveKeyCBC(ticket);
+
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, fileData.byteLength);
+          const chunk = fileData.slice(start, end);
+
+          // 加密当前块
+          const encryptedChunk = await crypto.subtle.encrypt(
+            { name: 'AES-CBC', iv: currentIV },
+            key,
+            chunk
+          );
+
+          encryptedChunks.push(new Uint8Array(encryptedChunk));
+
+          // 下一个块的IV是当前块密文的最后16字节
+          const encryptedChunkUint8 = new Uint8Array(encryptedChunk);
+          const last16Bytes = encryptedChunkUint8.slice(-16);
+          currentIV = last16Bytes;
+
+          self.postMessage({
+            type: 'PROGRESS',
+            data: {
+              progress: ((i + 1) / totalChunks) * 100,
+              currentChunk: i + 1,
+              totalChunks: totalChunks
+            }
+          });
+        }
+
+        // 合并所有加密块
+        const totalEncryptedLength = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        encryptedData = new Uint8Array(totalEncryptedLength);
+        let offset = 0;
+        const chunkCount = encryptedChunks.length; // 保存块数量
+        for (const chunk of encryptedChunks) {
+          encryptedData.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        // 保存初始IV
+        iv = initialIV;
       }
 
       self.postMessage({
@@ -171,7 +210,7 @@ self.addEventListener('message', async (e) => {
         data: {
           encryptedData: encryptedData,
           iv: iv,
-          chunkCount: 1
+          chunkCount: chunkCount
         }
       }, [encryptedData.buffer, iv.buffer]);
     } else if (type === 'DECRYPT') {
@@ -258,7 +297,7 @@ self.addEventListener('message', async (e) => {
       }, [new Uint8Array(decryptedData).buffer]);
     } else if (type === 'DECRYPT_RAW') {
       // 直接处理 Uint8Array，避免 base64 转换
-      const { encryptedData, iv, ticket, algorithm } = data;
+      const { encryptedData, iv, ticket, algorithm, originalFileSize } = data;
 
       const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
 
@@ -285,22 +324,75 @@ self.addEventListener('message', async (e) => {
           data: { progress: 100, currentChunk: 1, totalChunks: 1 }
         });
       } else {
-        // AES-CBC：直接解密整个文件，不分块
-        // 与AES-GCM保持一致，与加密逻辑对应
-        decryptedData = await crypto.subtle.decrypt(
-          {
-            name: 'AES-CBC',
-            iv: iv,
-          },
-          key,
-          encryptedData
-        );
-        decryptedData = new Uint8Array(decryptedData);
+        // AES-CBC：分块解密，使用CBC链式特性
+        // 根据原始文件大小计算每个加密块的边界
+        const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+        const decryptedChunks = [];
+        let currentIV = iv; // 初始IV
 
-        self.postMessage({
-          type: 'PROGRESS',
-          data: { progress: 100, currentChunk: 1, totalChunks: 1 }
-        });
+        // 如果没有提供原始文件大小，回退到直接解密整个文件
+        if (!originalFileSize) {
+          decryptedData = await crypto.subtle.decrypt(
+            { name: 'AES-CBC', iv: currentIV },
+            key,
+            encryptedData
+          );
+          decryptedData = new Uint8Array(decryptedData);
+
+          self.postMessage({
+            type: 'PROGRESS',
+            data: { progress: 100, currentChunk: 1, totalChunks: 1 }
+          });
+        } else {
+          // 计算总块数
+          const totalChunks = Math.ceil(originalFileSize / CHUNK_SIZE);
+          let encryptedOffset = 0;
+
+          for (let i = 0; i < totalChunks; i++) {
+            // 计算当前明文块的大小
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, originalFileSize);
+            const plainChunkSize = end - start;
+
+            // 计算当前密文块的大小（向上取整到16字节的倍数）
+            const cipherChunkSize = Math.ceil(plainChunkSize / 16) * 16;
+
+            // 提取当前密文块
+            const cipherChunk = encryptedData.slice(encryptedOffset, encryptedOffset + cipherChunkSize);
+            encryptedOffset += cipherChunkSize;
+
+            // 解密当前块
+            const decryptedChunk = await crypto.subtle.decrypt(
+              { name: 'AES-CBC', iv: currentIV },
+              key,
+              cipherChunk
+            );
+
+            decryptedChunks.push(new Uint8Array(decryptedChunk));
+
+            // 下一个块的IV是当前密文块的最后16字节
+            const last16Bytes = cipherChunk.slice(-16);
+            currentIV = last16Bytes;
+
+            self.postMessage({
+              type: 'PROGRESS',
+              data: {
+                progress: ((i + 1) / totalChunks) * 100,
+                currentChunk: i + 1,
+                totalChunks: totalChunks
+              }
+            });
+          }
+
+          // 合并所有解密块
+          const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+          decryptedData = new Uint8Array(totalDecryptedLength);
+          let offset = 0;
+          for (const chunk of decryptedChunks) {
+            decryptedData.set(chunk, offset);
+            offset += chunk.length;
+          }
+        }
       }
 
       self.postMessage({
@@ -310,6 +402,13 @@ self.addEventListener('message', async (e) => {
         }
       }, [new Uint8Array(decryptedData).buffer]);
     }
+  } catch (error) {
+    self.postMessage({
+      type: 'ERROR',
+      data: { message: error.message }
+    });
+  }
+});
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
@@ -476,6 +575,7 @@ export async function decryptFileWithWorkerRaw(
   iv: Uint8Array,
   ticket: string,
   algorithm: 'AES-GCM' | 'AES-CBC',
+  originalFileSize?: number,
   onProgress?: ProgressCallback
 ): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
@@ -527,7 +627,8 @@ export async function decryptFileWithWorkerRaw(
         encryptedData,
         iv,
         ticket,
-        algorithm
+        algorithm,
+        originalFileSize
       }
     }, [encryptedData.buffer]);
   });

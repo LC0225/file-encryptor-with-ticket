@@ -654,6 +654,7 @@ export default function Home() {
           ivBytes,
           ticket,
           'AES-GCM',
+          undefined, // AES-GCM不需要原始文件大小
           (progress) => {
             setEncryptionProgress(progress);
             setProcessedBytes((progress.progress / 100) * encryptedBytes.length);
@@ -852,11 +853,16 @@ export default function Home() {
         fileType = new TextDecoder().decode(fileTypeBytes);
         offset += fileTypeLength;
 
+        // 读取原始文件大小（用于AES-CBC分块解密）
+        const originalFileSize = Number(fileView.getBigUint64(offset, false));
+        offset += 8;
+
         // 读取加密数据
         const encryptedBytes = new Uint8Array(fileBuffer, offset);
         console.log('加密数据长度:', encryptedBytes.length, '字节');
         console.log('IV数据长度:', ivBytes.length, '字节');
         console.log('算法:', algorithm, '文件名:', fileName, '文件类型:', fileType);
+        console.log('原始文件大小:', originalFileSize, '字节');
 
         // 对于大文件，直接使用 Uint8Array，避免 base64 转换
         console.log('使用 Uint8Array 直接解密（避免 base64 转换）...');
@@ -869,12 +875,13 @@ export default function Home() {
           return;
         }
 
-        // 直接使用 Uint8Array 解密
+        // 直接使用 Uint8Array 解密（AES-CBC分块解密）
         const decryptedData = await decryptFileWithWorkerRaw(
           encryptedBytes,
           ivBytes,
           ticket,
           'AES-CBC',
+          originalFileSize, // 传递原始文件大小用于分块解密
           (progress) => {
             setEncryptionProgress(progress);
             setProcessedBytes((progress.progress / 100) * encryptedBytes.length);
@@ -953,7 +960,7 @@ export default function Home() {
 
     if (item.isLargeFile) {
       // 大文件：使用二进制格式
-      // 格式: [IV长度(4字节)][IV数据][算法长度(4字节)][算法][文件名长度(4字节)][文件名][文件类型长度(4字节)][文件类型][加密数据]
+      // 格式: [IV长度(4字节)][IV数据][算法长度(4字节)][算法][文件名长度(4字节)][文件名][文件类型长度(4字节)][文件类型][原始文件大小(8字节)][加密数据]
 
       const encoder = new TextEncoder();
       const algorithmBytes = encoder.encode(item.algorithm);
@@ -970,6 +977,7 @@ export default function Home() {
         fileNameBytes.length + // 文件名
         4 + // 文件类型长度
         fileTypeBytes.length + // 文件类型
+        8 + // 原始文件大小（64位整数）
         item.encryptedData.length; // 加密数据
 
       const buffer = new Uint8Array(totalLength);
@@ -999,6 +1007,10 @@ export default function Home() {
       offset += 4;
       buffer.set(fileTypeBytes, offset);
       offset += fileTypeBytes.length;
+
+      // 写入原始文件大小（用于AES-CBC分块解密）
+      new DataView(buffer.buffer).setBigUint64(offset, BigInt(item.fileSize), false); // 大端序
+      offset += 8;
 
       // 写入加密数据
       buffer.set(item.encryptedData, offset);
