@@ -298,8 +298,10 @@ self.addEventListener('message', async (e) => {
     } else if (type === 'DECRYPT_RAW') {
       // 直接处理 Uint8Array，避免 base64 转换
       const { encryptedData, iv, ticket, algorithm, originalFileSize } = data;
+      console.log('[Worker] DECRYPT_RAW 开始 - 算法:', algorithm, '原始文件大小:', originalFileSize);
 
       const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
+      console.log('[Worker] 密钥派生完成');
 
       self.postMessage({
         type: 'START',
@@ -332,68 +334,86 @@ self.addEventListener('message', async (e) => {
 
         // 如果没有提供原始文件大小，回退到直接解密整个文件
         if (!originalFileSize) {
+          console.log('[Worker] 没有提供原始文件大小，回退到直接解密');
           decryptedData = await crypto.subtle.decrypt(
             { name: 'AES-CBC', iv: currentIV },
             key,
             encryptedData
           );
           decryptedData = new Uint8Array(decryptedData);
+          console.log('[Worker] 直接解密完成');
 
           self.postMessage({
             type: 'PROGRESS',
             data: { progress: 100, currentChunk: 1, totalChunks: 1 }
           });
         } else {
-          // 计算总块数
-          const totalChunks = Math.ceil(originalFileSize / CHUNK_SIZE);
-          let encryptedOffset = 0;
+          try {
+            // 计算总块数
+            const totalChunks = Math.ceil(originalFileSize / CHUNK_SIZE);
+            console.log('[Worker] 开始分块解密 - 总块数:', totalChunks);
+            let encryptedOffset = 0;
 
-          for (let i = 0; i < totalChunks; i++) {
-            // 计算当前明文块的大小
-            const start = i * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, originalFileSize);
-            const plainChunkSize = end - start;
+            for (let i = 0; i < totalChunks; i++) {
+              // 计算当前明文块的大小
+              const start = i * CHUNK_SIZE;
+              const end = Math.min(start + CHUNK_SIZE, originalFileSize);
+              const plainChunkSize = end - start;
 
-            // 计算当前密文块的大小（向上取整到16字节的倍数）
-            const cipherChunkSize = Math.ceil(plainChunkSize / 16) * 16;
+              // 计算当前密文块的大小（向上取整到16字节的倍数）
+              const cipherChunkSize = Math.ceil(plainChunkSize / 16) * 16;
 
-            // 提取当前密文块
-            const cipherChunk = encryptedData.slice(encryptedOffset, encryptedOffset + cipherChunkSize);
-            encryptedOffset += cipherChunkSize;
+              console.log(\`[Worker] 解密块 \${i + 1}/\${totalChunks} - 明文大小: \${plainChunkSize}, 密文大小: \${cipherChunkSize}\`);
 
-            // 解密当前块
-            const decryptedChunk = await crypto.subtle.decrypt(
-              { name: 'AES-CBC', iv: currentIV },
-              key,
-              cipherChunk
-            );
+              // 提取当前密文块
+              const cipherChunk = encryptedData.slice(encryptedOffset, encryptedOffset + cipherChunkSize);
+              encryptedOffset += cipherChunkSize;
 
-            decryptedChunks.push(new Uint8Array(decryptedChunk));
+              // 解密当前块
+              const decryptedChunk = await crypto.subtle.decrypt(
+                { name: 'AES-CBC', iv: currentIV },
+                key,
+                cipherChunk
+              );
 
-            // 下一个块的IV是当前密文块的最后16字节
-            const last16Bytes = cipherChunk.slice(-16);
-            currentIV = last16Bytes;
+              decryptedChunks.push(new Uint8Array(decryptedChunk));
+              console.log(\`[Worker] 块 \${i + 1}/\${totalChunks} 解密成功\`);
 
-            self.postMessage({
-              type: 'PROGRESS',
-              data: {
-                progress: ((i + 1) / totalChunks) * 100,
-                currentChunk: i + 1,
-                totalChunks: totalChunks
-              }
-            });
-          }
+              // 下一个块的IV是当前密文块的最后16字节
+              const last16Bytes = cipherChunk.slice(-16);
+              currentIV = last16Bytes;
 
-          // 合并所有解密块
-          const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-          decryptedData = new Uint8Array(totalDecryptedLength);
-          let offset = 0;
-          for (const chunk of decryptedChunks) {
-            decryptedData.set(chunk, offset);
-            offset += chunk.length;
+              self.postMessage({
+                type: 'PROGRESS',
+                data: {
+                  progress: ((i + 1) / totalChunks) * 100,
+                  currentChunk: i + 1,
+                  totalChunks: totalChunks
+                }
+              });
+
+              console.log(\`[Worker] 进度更新: \${((i + 1) / totalChunks * 100).toFixed(2)}%\`);
+            }
+
+            // 合并所有解密块
+            console.log('[Worker] 开始合并解密块...');
+            const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+            console.log('[Worker] 合并后的总长度:', totalDecryptedLength);
+            decryptedData = new Uint8Array(totalDecryptedLength);
+            let offset = 0;
+            for (const chunk of decryptedChunks) {
+              decryptedData.set(chunk, offset);
+              offset += chunk.length;
+            }
+            console.log('[Worker] 分块解密合并完成，准备发送COMPLETE消息');
+          } catch (chunkError) {
+            console.error('[Worker] 分块解密错误:', chunkError);
+            throw chunkError;
           }
         }
       }
+
+      console.log('[Worker] 准备发送COMPLETE消息，解密数据长度:', decryptedData.byteLength);
 
       self.postMessage({
         type: 'COMPLETE',
@@ -528,12 +548,14 @@ export async function decryptFileWithWorker(
           break;
         case 'COMPLETE':
           // 解密完成
+          console.log('[decryptFileWithWorkerRaw] 解密完成，数据长度:', data.decryptedData.byteLength);
           worker.terminate();
           URL.revokeObjectURL(workerUrl);
           resolve(data.decryptedData as Uint8Array);
           break;
         case 'ERROR':
           // 解密错误
+          console.error('[decryptFileWithWorkerRaw] 解密错误:', data.message);
           worker.terminate();
           URL.revokeObjectURL(workerUrl);
           reject(new Error(data.message));
@@ -571,6 +593,10 @@ export async function decryptFileWithWorkerRaw(
   originalFileSize?: number,
   onProgress?: ProgressCallback
 ): Promise<Uint8Array> {
+  console.log('[decryptFileWithWorkerRaw] 开始 - 算法:', algorithm, '原始文件大小:', originalFileSize);
+  console.log('[decryptFileWithWorkerRaw] 加密数据长度:', encryptedData.byteLength);
+  console.log('[decryptFileWithWorkerRaw] IV长度:', iv.byteLength);
+
   return new Promise((resolve, reject) => {
     // 创建Worker（直接内联代码）
     const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
@@ -580,10 +606,12 @@ export async function decryptFileWithWorkerRaw(
     // 监听消息
     worker.onmessage = (e) => {
       const { type, data } = e.data;
+      console.log('[decryptFileWithWorkerRaw] 收到Worker消息:', type);
 
       switch (type) {
         case 'START':
           // 解密开始
+          console.log('[decryptFileWithWorkerRaw] 解密开始');
           break;
         case 'PROGRESS':
           // 更新进度
@@ -593,12 +621,14 @@ export async function decryptFileWithWorkerRaw(
           break;
         case 'COMPLETE':
           // 解密完成
+          console.log('[decryptFileWithWorkerRaw] 解密完成，数据长度:', data.decryptedData.byteLength);
           worker.terminate();
           URL.revokeObjectURL(workerUrl);
           resolve(data.decryptedData as Uint8Array);
           break;
         case 'ERROR':
           // 解密错误
+          console.error('[decryptFileWithWorkerRaw] 解密错误:', data.message);
           worker.terminate();
           URL.revokeObjectURL(workerUrl);
           reject(new Error(data.message));
@@ -607,6 +637,7 @@ export async function decryptFileWithWorkerRaw(
     };
 
     worker.onerror = (error) => {
+      console.error('[decryptFileWithWorkerRaw] Worker错误:', error);
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
       reject(new Error(`Worker错误: ${error.message}`));
@@ -614,6 +645,7 @@ export async function decryptFileWithWorkerRaw(
 
     // 发送解密任务（只转移大的 encryptedData，IV 很小不需要转移）
     // 注意：不能同时转移多个可能共享同一底层buffer的ArrayBuffer
+    console.log('[decryptFileWithWorkerRaw] 发送DECRYPT_RAW消息到Worker');
     worker.postMessage({
       type: 'DECRYPT_RAW',
       data: {
@@ -624,5 +656,6 @@ export async function decryptFileWithWorkerRaw(
         originalFileSize
       }
     }, [encryptedData.buffer]);
+    console.log('[decryptFileWithWorkerRaw] 消息已发送，等待Worker响应...');
   });
 }
