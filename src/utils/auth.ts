@@ -164,16 +164,35 @@ export async function getCurrentUser(): Promise<User | null> {
     return localUser;
   }
 
-  console.log('⚠️ localStorage 中没有用户信息，尝试从数据库获取');
+  console.log('⚠️ localStorage 中没有 session，尝试从token恢复');
+
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    console.log('⚠️ 没有找到 token');
+    return null;
+  }
+
+  // 尝试从token中提取用户信息（兼容旧token）
+  try {
+    const tokenData = JSON.parse(atob(token));
+    if (tokenData && tokenData.id && tokenData.username) {
+      console.log('🔧 从旧token恢复session:', tokenData.username);
+      const session = {
+        userId: tokenData.id,
+        username: tokenData.username,
+        role: tokenData.role || 'user',
+        loginTime: tokenData.loginTime || new Date().toISOString(),
+      };
+      localStorage.setItem('crypto_session', JSON.stringify(session));
+      console.log('✅ 已从token恢复session，重新获取用户');
+      return authLocalStorage.getCurrentUser();
+    }
+  } catch (error) {
+    console.log('⚠️ 无法从token解析用户信息，尝试从数据库获取');
+  }
 
   if (canUseDatabase()) {
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) {
-        console.log('⚠️ 没有找到 token');
-        return null;
-      }
-
       const response = await fetch('/api/auth/user', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -193,6 +212,14 @@ export async function getCurrentUser(): Promise<User | null> {
       const data = await response.json();
       if (data.success) {
         console.log('✅ 从数据库获取到当前用户:', data.user.username);
+        // 同时保存session到localStorage（用于下次直接获取）
+        const session = {
+          userId: data.user.id,
+          username: data.user.username,
+          role: data.user.role,
+          loginTime: new Date().toISOString(),
+        };
+        localStorage.setItem('crypto_session', JSON.stringify(session));
         return data.user;
       }
 
