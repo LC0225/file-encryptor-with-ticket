@@ -1,6 +1,7 @@
 import { User } from './authLocalStorage';
 import { EncryptionHistory } from '@/types';
 import type { AppData, SyncResult, SyncStatus } from '@/types';
+import { canUseDatabase } from './config';
 
 // 同步状态（存储在 localStorage）
 const SYNC_STATUS_KEY = 'crypto_sync_status';
@@ -91,6 +92,15 @@ function applyCloudDataToLocal(data: AppData): void {
  */
 export async function syncFromCloud(): Promise<SyncResult> {
   try {
+    // 如果数据库不可用，直接返回（不进行同步）
+    if (!canUseDatabase()) {
+      updateSyncStatus({ enabled: false });
+      return {
+        success: true,
+        message: '云端同步未启用（静态模式）',
+      };
+    }
+
     updateSyncStatus({ syncing: true });
 
     // 通过 API 下载云端数据
@@ -164,6 +174,15 @@ export async function syncFromCloud(): Promise<SyncResult> {
  */
 export async function syncToCloud(): Promise<SyncResult> {
   try {
+    // 如果数据库不可用，直接返回（不进行同步）
+    if (!canUseDatabase()) {
+      updateSyncStatus({ enabled: false });
+      return {
+        success: true,
+        message: '云端同步未启用（静态模式）',
+      };
+    }
+
     updateSyncStatus({ syncing: true });
 
     // 获取本地数据
@@ -255,6 +274,12 @@ export async function fullSync(): Promise<SyncResult> {
  */
 export async function checkCloudStatus(): Promise<void> {
   try {
+    // 如果数据库不可用，直接返回（不进行检查）
+    if (!canUseDatabase()) {
+      updateSyncStatus({ enabled: false, cloudExists: false });
+      return;
+    }
+
     // 通过 API 检查云端数据状态
     const response = await fetch('/api/cloud-sync', {
       method: 'POST',
