@@ -63,6 +63,7 @@ export default function Home() {
   const [showProgress, setShowProgress] = useState(false);
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
   const [processedBytes, setProcessedBytes] = useState(0);
+  const [isTicketAutoFilled, setIsTicketAutoFilled] = useState(false);
 
   // Helper函数：将Uint8Array转换为base64（分块处理，避免堆栈溢出）
   const uint8ArrayToBase64 = (array: Uint8Array): string => {
@@ -102,10 +103,11 @@ export default function Home() {
     if (savedTicket) {
       setMode('decrypt');
       setTicket(savedTicket);
+      setIsTicketAutoFilled(true); // 标记为自动填充
       sessionStorage.removeItem('decrypt_ticket');
       // 显示提示信息
       setSuccess('已自动填充解密ticket，请选择加密文件后点击解密按钮');
-      // 3秒后清除提示
+      // 5秒后清除提示
       setTimeout(() => {
         setSuccess('');
       }, 5000);
@@ -1289,11 +1291,14 @@ export default function Home() {
                 <input
                   type="text"
                   value={ticket}
-                  onChange={(e) => setTicket(e.target.value)}
+                  onChange={(e) => {
+                    setTicket(e.target.value);
+                    setIsTicketAutoFilled(false); // 手动输入时清除自动填充标记
+                  }}
                   placeholder="输入解密ticket"
                   className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 />
-                {ticket && files.length === 0 && (
+                {isTicketAutoFilled && ticket && files.length === 0 && (
                   <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
                     <div className="flex items-start gap-2">
                       <svg className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
