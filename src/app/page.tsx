@@ -70,6 +70,12 @@ export default function Home() {
       setMode('decrypt');
       setTicket(savedTicket);
       sessionStorage.removeItem('decrypt_ticket');
+      // 显示提示信息
+      setSuccess('已自动填充解密ticket，请选择加密文件后点击解密按钮');
+      // 3秒后清除提示
+      setTimeout(() => {
+        setSuccess('');
+      }, 5000);
     }
   }, []);
 
@@ -431,32 +437,35 @@ export default function Home() {
       <nav className="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">
               文件加密工具
             </h1>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {isMounted && isAdmin() && (
                 <Link
                   href="/admin"
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                  className="rounded-lg px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
                 >
-                  管理员面板
+                  <span className="hidden sm:inline">管理员面板</span>
+                  <span className="sm:hidden">管理</span>
                 </Link>
               )}
               <Link
                 href="/profile"
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                className="rounded-lg px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
               >
-                个人中心
+                <span className="hidden sm:inline">个人中心</span>
+                <span className="sm:hidden">我的</span>
               </Link>
               <button
                 onClick={() => {
                   logoutUser();
                   router.push('/login');
                 }}
-                className="rounded-lg border border-red-600 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20"
+                className="rounded-lg border border-red-600 px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20"
               >
-                退出登录
+                <span className="hidden sm:inline">退出登录</span>
+                <span className="sm:hidden">退出</span>
               </button>
             </div>
           </div>
@@ -468,10 +477,10 @@ export default function Home() {
         <div className="space-y-8">
           {/* 标题 */}
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
               安全文件加密
             </h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
+            <p className="mt-2 px-4 text-sm sm:text-base text-gray-600 dark:text-gray-400">
               支持文档、图片、视频、音频等常用文件类型，每个文件独立ticket保护
             </p>
           </div>
@@ -488,13 +497,13 @@ export default function Home() {
           </div>
 
           {/* 模式切换 */}
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-3 sm:gap-4">
             <button
               onClick={() => {
                 setMode('encrypt');
                 reset();
               }}
-              className={`rounded-lg px-6 py-3 font-medium transition-colors ${
+              className={`rounded-lg px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-medium transition-colors ${
                 mode === 'encrypt'
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -507,7 +516,7 @@ export default function Home() {
                 setMode('decrypt');
                 reset();
               }}
-              className={`rounded-lg px-6 py-3 font-medium transition-colors ${
+              className={`rounded-lg px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-medium transition-colors ${
                 mode === 'decrypt'
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -518,19 +527,19 @@ export default function Home() {
           </div>
 
           {/* 主卡片 */}
-          <div className="rounded-xl bg-white p-8 shadow-lg dark:bg-gray-800">
+          <div className="rounded-xl bg-white p-4 sm:p-8 shadow-lg dark:bg-gray-800">
             {/* 文件上传 */}
             <div className="mb-6">
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {mode === 'encrypt' ? '选择文件（支持多选）' : '选择加密文件'}
               </label>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <input
                   ref={fileInputRef}
                   type="file"
                   onChange={handleFileChange}
                   multiple={mode === 'encrypt'}
-                  className="block flex-1 rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  className="block w-full flex-1 rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 />
                 {(files.length > 0 || ticket || encryptedFiles.length > 0 || decryptedFile) && (
                   <button
@@ -539,13 +548,13 @@ export default function Home() {
                         reset();
                       }
                     }}
-                    className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-red-900/20 dark:hover:border-red-700 dark:hover:text-red-400 transition-colors"
+                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-red-900/20 dark:hover:border-red-700 dark:hover:text-red-400 transition-colors"
                     title="清空所有内容"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
-                    清空
+                    <span className="hidden sm:inline">清空</span>
                   </button>
                 )}
               </div>
@@ -596,7 +605,7 @@ export default function Home() {
 
             {/* Ticket输入（解密模式） */}
             {mode === 'decrypt' && (
-              <div className="mb-6">
+              <div className="mb-6 space-y-3">
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Ticket（解密密钥）
                 </label>
@@ -607,16 +616,31 @@ export default function Home() {
                   placeholder="输入解密ticket"
                   className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 />
+                {ticket && files.length === 0 && (
+                  <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+                    <div className="flex items-start gap-2">
+                      <svg className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="font-medium">已自动填充解密ticket</p>
+                        <p className="text-xs sm:text-sm mt-1 opacity-90">
+                          请先选择加密文件，然后点击解密按钮完成解密
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* 操作按钮 */}
             {mode === 'encrypt' ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <button
                   onClick={handleEncryptGCM}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
+                  className="w-full rounded-lg bg-blue-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
                 >
                   {loading
                     ? '处理中...'
@@ -627,7 +651,7 @@ export default function Home() {
                 <button
                   onClick={handleEncryptCBC}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-purple-600 px-4 py-3 font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
+                  className="w-full rounded-lg bg-purple-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
                 >
                   {loading
                     ? '处理中...'
@@ -637,18 +661,18 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <button
                   onClick={handleDecryptGCM}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
+                  className="w-full rounded-lg bg-blue-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
                 >
                   {loading ? '处理中...' : 'AES-GCM解密文件'}
                 </button>
                 <button
                   onClick={handleDecryptCBC}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-purple-600 px-4 py-3 font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
+                  className="w-full rounded-lg bg-purple-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
                 >
                   {loading ? '处理中...' : 'AES-CBC解密文件'}
                 </button>
@@ -673,7 +697,7 @@ export default function Home() {
             {mode === 'encrypt' && encryptedFiles.length > 0 && (
               <div className="mt-6 space-y-4">
                 {encryptedFiles.length > 1 && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                       <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -682,7 +706,7 @@ export default function Home() {
                     </div>
                     <button
                       onClick={downloadAllEncryptedFiles}
-                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
+                      className="w-full sm:w-auto rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
                     >
                       下载所有加密文件
                     </button>
@@ -691,12 +715,12 @@ export default function Home() {
                 {encryptedFiles.map((item, index) => (
                   <div
                     key={index}
-                    className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900"
+                    className="rounded-lg border border-gray-200 bg-gray-50 p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-900"
                   >
-                    <div className="mb-3 flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                    <div className="mb-3 flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-white break-all">
                             {item.fileName}
                           </h3>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
@@ -709,7 +733,7 @@ export default function Home() {
                       </div>
                       <button
                         onClick={() => downloadEncryptedFile(item)}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
+                        className="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
                       >
                         下载
                       </button>

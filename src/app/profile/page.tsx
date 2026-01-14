@@ -191,30 +191,32 @@ export default function Profile() {
       <nav className="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                className="flex items-center gap-2 text-lg sm:text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-                返回主页
+                <span className="hidden sm:inline">返回主页</span>
+                <span className="sm:hidden">返回</span>
               </Link>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 hidden sm:inline">
                 {currentUser?.username}
               </span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {isMounted && isAdmin() && (
                 <Link
                   href="/admin"
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                  className="rounded-lg px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
                 >
-                  管理员面板
+                  <span className="hidden sm:inline">管理员面板</span>
+                  <span className="sm:hidden">管理</span>
                 </Link>
               )}
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:inline">
                 个人中心
               </div>
               <button
@@ -222,9 +224,10 @@ export default function Profile() {
                   logoutUser();
                   router.push('/login');
                 }}
-                className="rounded-lg border border-red-600 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20"
+                className="rounded-lg border border-red-600 px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/20"
               >
-                退出登录
+                <span className="hidden sm:inline">退出登录</span>
+                <span className="sm:hidden">退出</span>
               </button>
             </div>
           </div>
@@ -235,20 +238,20 @@ export default function Profile() {
       <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="space-y-8">
           {/* 标题 */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 加密历史
               </h2>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
+              <p className="mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
                 管理您的加密文件历史记录，每个文件都有独立的ticket
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               {history.length > 1 && (
                 <button
                   onClick={downloadAllEncryptedFiles}
-                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
+                  className="w-full sm:w-auto rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
                 >
                   下载所有文件
                 </button>
@@ -256,7 +259,7 @@ export default function Profile() {
               {history.length > 0 && (
                 <button
                   onClick={handleClearAll}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-700"
+                  className="w-full sm:w-auto rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-700"
                 >
                   清空所有记录
                 </button>
@@ -504,26 +507,26 @@ export default function Profile() {
                   {filteredHistory.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-xl bg-white p-6 shadow dark:bg-gray-800"
+                      className="rounded-xl bg-white p-4 sm:p-6 shadow dark:bg-gray-800"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white break-all">
                               {highlightText(item.fileName, searchQuery)}
                             </h3>
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
                               {getFileTypeLabel(item.fileType)}
                             </span>
                           </div>
-                          <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                          <div className="mt-2 space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                             <p>文件大小：{formatFileSize(item.fileSize)}</p>
                             <p>加密时间：{formatDate(item.createdAt)}</p>
                           </div>
                         </div>
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="ml-4 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          className="flex-shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                           title="删除记录"
                         >
                           <svg
@@ -543,28 +546,28 @@ export default function Profile() {
                       </div>
 
                       {/* Ticket区域 */}
-                      <div className="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+                      <div className="mt-4 rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-900">
                         <div className="mb-2 flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                             Ticket（解密密钥）
                           </span>
                           <button
                             onClick={() => handleCopyTicket(item.ticket)}
-                            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                           >
                             复制
                           </button>
                         </div>
-                        <code className="block break-all rounded bg-white p-3 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+                        <code className="block break-all rounded bg-white p-2 sm:p-3 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200">
                           {searchQuery ? highlightText(item.ticket, searchQuery) : item.ticket}
                         </code>
                       </div>
 
                       {/* 操作按钮 */}
-                      <div className="mt-4 flex flex-wrap gap-3">
+                      <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
                         <button
                           onClick={() => handleDownloadEncryptedFile(item)}
-                          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
+                          className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
                         >
                           <svg
                             className="h-4 w-4"
@@ -586,7 +589,7 @@ export default function Profile() {
                             sessionStorage.setItem('decrypt_ticket', item.ticket);
                             window.location.href = '/';
                           }}
-                          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                          className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                           <svg
                             className="h-4 w-4"
