@@ -145,10 +145,14 @@ export async function getCurrentUser(): Promise<User | null> {
         },
       });
 
-      if (response.status === 401) {
-        // Token无效，清除本地存储
-        localStorage.removeItem(TOKEN_KEY);
-        return null;
+      if (!response.ok) {
+        // API 调用失败（401, 404, 500 等），回退到 localStorage
+        console.warn(`API /api/auth/user 返回 ${response.status}，回退到 localStorage 方案`);
+        if (response.status === 401) {
+          // Token无效，清除本地存储
+          localStorage.removeItem(TOKEN_KEY);
+        }
+        return authLocalStorage.getCurrentUser();
       }
 
       const data = await response.json();
@@ -156,13 +160,16 @@ export async function getCurrentUser(): Promise<User | null> {
         return data.user;
       }
 
-      return null;
+      // API 返回失败，回退到 localStorage
+      console.warn('API /api/auth/user 返回失败，回退到 localStorage 方案');
+      return authLocalStorage.getCurrentUser();
     } catch (error) {
       console.error('获取当前用户失败（数据库），回退到localStorage:', error);
       // 如果数据库失败，回退到localStorage
+      return authLocalStorage.getCurrentUser();
     }
   }
-  
+
   // 使用localStorage方案
   return authLocalStorage.getCurrentUser();
 }
