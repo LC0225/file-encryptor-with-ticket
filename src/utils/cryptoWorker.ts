@@ -61,7 +61,7 @@ async function deriveKeyGCM(ticket) {
     encoder.encode(ticket),
     'PBKDF2',
     false,
-    ['deriveKey', 'decrypt']
+    ['deriveKey']
   );
 
   return crypto.subtle.deriveKey(
@@ -88,7 +88,7 @@ async function deriveKeyCBC(ticket) {
     encoder.encode(ticket),
     'PBKDF2',
     false,
-    ['deriveKey', 'decrypt']
+    ['deriveKey']
   );
 
   return crypto.subtle.deriveKey(
