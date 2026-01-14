@@ -38,38 +38,32 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'download') {
-      // 检查云端数据是否存在
-      const cloudExists = await checkCloudDataExists();
-
-      if (!cloudExists && !userId) {
-        return NextResponse.json<SyncResult>({
-          success: true,
-          message: '云端暂无数据，将使用本地数据',
-        });
-      }
-
       // 分别下载用户列表和用户加密历史
       const cloudUsers = await downloadUsers();
       const cloudHistory = userId ? await downloadUserHistory(userId) : null;
 
-      // 云端数据不存在
-      if (!cloudUsers && !cloudHistory) {
+      // 云端数据完全不存在（用户列表和历史都是null）
+      if (cloudUsers === null && cloudHistory === null) {
         return NextResponse.json<SyncResult>({
           success: true,
           message: '云端暂无数据，将使用本地数据',
         });
       }
 
+      // 处理可能为空数组或null的情况
+      const users = cloudUsers || [];
+      const history = cloudHistory || [];
+
       const cloudData: AppData = {
         version: Date.now(),
-        users: cloudUsers || [],
-        history: cloudHistory || [],
+        users,
+        history,
       };
 
       return NextResponse.json<SyncResult>({
         success: true,
         cloudData,
-        message: `已从云端同步 ${cloudData.users.length} 个用户和 ${cloudData.history.length} 条加密记录`,
+        message: `已从云端同步 ${users.length} 个用户和 ${history.length} 条加密记录`,
         downloaded: true,
       });
     }

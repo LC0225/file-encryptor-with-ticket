@@ -289,8 +289,13 @@ export async function fullSync(): Promise<SyncResult> {
     // 1. 尝试下载云端数据
     const downloadResult = await syncFromCloud();
 
+    // 如果下载失败且原因是"未登录"，不要尝试上传
+    if (!downloadResult.success && downloadResult.message?.includes('未登录')) {
+      return downloadResult;
+    }
+
     if (!downloadResult.success && !downloadResult.downloaded) {
-      // 如果下载失败且云端无数据，直接上传本地数据
+      // 如果下载失败且云端无数据（非"未登录"原因），直接上传本地数据
       const uploadResult = await syncToCloud();
       return uploadResult;
     }
