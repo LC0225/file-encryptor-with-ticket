@@ -409,13 +409,6 @@ self.addEventListener('message', async (e) => {
     });
   }
 });
-  } catch (error) {
-    self.postMessage({
-      type: 'ERROR',
-      data: { message: error.message }
-    });
-  }
-});
 `;
 
 /**
