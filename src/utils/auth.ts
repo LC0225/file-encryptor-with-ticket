@@ -101,6 +101,18 @@ export async function loginUser(
       if (data.success && data.token) {
         // 保存token到localStorage
         localStorage.setItem(TOKEN_KEY, data.token);
+
+        // 同时保存session到localStorage（用于 getCurrentUser）
+        if (data.user) {
+          const session = {
+            userId: data.user.id,
+            username: data.user.username,
+            role: data.user.role,
+            loginTime: new Date().toISOString(),
+          };
+          localStorage.setItem('crypto_session', JSON.stringify(session));
+        }
+
         return { success: true, message: data.message, user: data.user };
       }
 
