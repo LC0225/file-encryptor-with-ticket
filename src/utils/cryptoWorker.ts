@@ -519,7 +519,8 @@ export async function decryptFileWithWorkerRaw(
       reject(new Error(`Worker错误: ${error.message}`));
     };
 
-    // 发送解密任务（使用 Transferable Object 传递数据）
+    // 发送解密任务（只转移大的 encryptedData，IV 很小不需要转移）
+    // 注意：不能同时转移多个可能共享同一底层buffer的ArrayBuffer
     worker.postMessage({
       type: 'DECRYPT_RAW',
       data: {
@@ -528,6 +529,6 @@ export async function decryptFileWithWorkerRaw(
         ticket,
         algorithm
       }
-    }, [encryptedData.buffer, iv.buffer]);
+    }, [encryptedData.buffer]);
   });
 }
