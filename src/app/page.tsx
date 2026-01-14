@@ -468,6 +468,14 @@ export default function Home() {
     try {
       const file = files[0];
 
+      // 验证文件扩展名
+      if (!file.name.endsWith('.encrypted')) {
+        setError('请选择正确的加密文件（文件扩展名应为 .encrypted）');
+        setLoading(false);
+        setShowProgress(false);
+        return;
+      }
+
       // 判断文件格式（JSON 或 二进制）
       const fileBuffer = await file.arrayBuffer();
       const fileView = new DataView(fileBuffer);
@@ -525,8 +533,17 @@ export default function Home() {
 
         try {
           const jsonData = JSON.parse(fileContent);
-          if (!jsonData.data || !jsonData.iv) {
-            throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+          if (!jsonData.data) {
+            throw new Error('加密文件中缺少加密数据（data字段）');
+          }
+          if (!jsonData.iv) {
+            throw new Error('加密文件中缺少IV（iv字段）');
+          }
+          if (jsonData.data.length === 0) {
+            throw new Error('加密数据为空（data字段为空字符串）');
+          }
+          if (jsonData.iv.length === 0) {
+            throw new Error('IV为空（iv字段为空字符串）');
           }
           encryptedData = jsonData.data;
           iv = jsonData.iv;
@@ -534,7 +551,12 @@ export default function Home() {
           fileType = jsonData.fileType || 'application/octet-stream';
           algorithm = jsonData.algorithm || 'AES-GCM';
         } catch (parseError) {
-          setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
+          const errorMsg = (parseError as Error).message;
+          if (errorMsg.startsWith('JSON')) {
+            setError(`加密文件格式错误：不是有效的 JSON 格式。请确保选择了正确的 .encrypted 文件。`);
+          } else {
+            setError(`加密文件解析失败：${errorMsg}`);
+          }
           setLoading(false);
           setShowProgress(false);
           return;
@@ -544,6 +566,21 @@ export default function Home() {
       // 如果文件是用AES-CBC加密的，提示用户使用AES-CBC解密
       if (algorithm === 'AES-CBC') {
         setError('此文件使用AES-CBC加密，请使用AES-CBC解密按钮');
+        setLoading(false);
+        setShowProgress(false);
+        return;
+      }
+
+      // 验证加密数据是否有效
+      if (!encryptedData || encryptedData.length === 0) {
+        setError('加密数据为空，无法解密。请确保选择了正确的加密文件。');
+        setLoading(false);
+        setShowProgress(false);
+        return;
+      }
+
+      if (!iv || iv.length === 0) {
+        setError('IV（初始化向量）为空，无法解密。请确保选择了正确的加密文件。');
         setLoading(false);
         setShowProgress(false);
         return;
@@ -600,6 +637,14 @@ export default function Home() {
 
     try {
       const file = files[0];
+
+      // 验证文件扩展名
+      if (!file.name.endsWith('.encrypted')) {
+        setError('请选择正确的加密文件（文件扩展名应为 .encrypted）');
+        setLoading(false);
+        setShowProgress(false);
+        return;
+      }
 
       // 判断文件格式（JSON 或 二进制）
       const fileBuffer = await file.arrayBuffer();
@@ -658,8 +703,17 @@ export default function Home() {
 
         try {
           const jsonData = JSON.parse(fileContent);
-          if (!jsonData.data || !jsonData.iv) {
-            throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+          if (!jsonData.data) {
+            throw new Error('加密文件中缺少加密数据（data字段）');
+          }
+          if (!jsonData.iv) {
+            throw new Error('加密文件中缺少IV（iv字段）');
+          }
+          if (jsonData.data.length === 0) {
+            throw new Error('加密数据为空（data字段为空字符串）');
+          }
+          if (jsonData.iv.length === 0) {
+            throw new Error('IV为空（iv字段为空字符串）');
           }
           encryptedData = jsonData.data;
           iv = jsonData.iv;
@@ -667,7 +721,12 @@ export default function Home() {
           fileType = jsonData.fileType || 'application/octet-stream';
           algorithm = jsonData.algorithm || 'AES-CBC';
         } catch (parseError) {
-          setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
+          const errorMsg = (parseError as Error).message;
+          if (errorMsg.startsWith('JSON')) {
+            setError(`加密文件格式错误：不是有效的 JSON 格式。请确保选择了正确的 .encrypted 文件。`);
+          } else {
+            setError(`加密文件解析失败：${errorMsg}`);
+          }
           setLoading(false);
           setShowProgress(false);
           return;
@@ -677,6 +736,21 @@ export default function Home() {
       // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
       if (algorithm === 'AES-GCM') {
         setError('此文件使用AES-GCM加密，请使用AES-GCM解密按钮');
+        setLoading(false);
+        setShowProgress(false);
+        return;
+      }
+
+      // 验证加密数据是否有效
+      if (!encryptedData || encryptedData.length === 0) {
+        setError('加密数据为空，无法解密。请确保选择了正确的加密文件。');
+        setLoading(false);
+        setShowProgress(false);
+        return;
+      }
+
+      if (!iv || iv.length === 0) {
+        setError('IV（初始化向量）为空，无法解密。请确保选择了正确的加密文件。');
         setLoading(false);
         setShowProgress(false);
         return;
