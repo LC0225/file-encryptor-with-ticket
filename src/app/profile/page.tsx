@@ -521,6 +521,7 @@ export default function Profile() {
                           </div>
                           <div className="mt-2 space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                             <p>文件大小：{formatFileSize(item.fileSize)}</p>
+                            <p>加密算法：{item.algorithm}</p>
                             <p>加密时间：{formatDate(item.createdAt)}</p>
                           </div>
                         </div>
