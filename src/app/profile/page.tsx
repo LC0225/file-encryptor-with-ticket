@@ -523,6 +523,7 @@ export default function Profile() {
                             <p>文件大小：{formatFileSize(item.fileSize)}</p>
                             <p>加密时间：{formatDate(item.createdAt)}</p>
                             <div className="flex items-center gap-2 mt-2">
+                              <span className="font-medium">加密类型：</span>
                               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${item.algorithm === 'AES-GCM' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}>
                                 {item.algorithm}
                               </span>

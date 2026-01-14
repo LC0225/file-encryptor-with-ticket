@@ -1477,13 +1477,16 @@ export default function Home() {
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
                             {getFileTypeLabel(item.fileType)}
                           </span>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.algorithm === 'AES-GCM' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}>
-                            {item.algorithm}
-                          </span>
                         </div>
                         <div className="mt-2 space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                           <p>文件大小：{(item.fileSize / 1024).toFixed(2)} KB</p>
                           <p>加密时间：{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '-'}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="font-medium">加密类型：</span>
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${item.algorithm === 'AES-GCM' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}>
+                              {item.algorithm}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <button
