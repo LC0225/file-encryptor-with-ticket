@@ -17,19 +17,20 @@ function getUserHistoryPath(userId: string): string {
 /**
  * 上传用户列表到 Supabase Storage
  * @param users 用户列表
- * @returns 上传成功返回 true
+ * @returns 上传成功返回 true，失败返回 false
+ * @throws Error 如果上传过程中发生错误
  */
 export async function uploadUsers(users: User[]): Promise<boolean> {
   try {
     if (!isSupabaseConfigured()) {
       console.warn('Supabase 未配置，跳过上传用户列表');
-      return false;
+      throw new Error('Supabase未配置，请在环境变量中设置NEXT_PUBLIC_SUPABASE_URL和NEXT_PUBLIC_SUPABASE_ANON_KEY');
     }
 
     const supabase = getSupabaseClient();
     if (!supabase) {
       console.warn('Supabase 客户端未初始化，跳过上传用户列表');
-      return false;
+      throw new Error('Supabase客户端初始化失败');
     }
 
     const jsonContent = JSON.stringify(users, null, 2);
@@ -107,19 +108,20 @@ export async function downloadUsers(): Promise<User[] | null> {
  * 上传用户的加密历史到 Supabase Storage
  * @param userId 用户ID
  * @param history 加密历史记录
- * @returns 上传成功返回 true
+ * @returns 上传成功返回 true，失败返回 false
+ * @throws Error 如果上传过程中发生错误
  */
 export async function uploadUserHistory(userId: string, history: EncryptionHistory[]): Promise<boolean> {
   try {
     if (!isSupabaseConfigured()) {
       console.warn('Supabase 未配置，跳过上传加密历史');
-      return false;
+      throw new Error('Supabase未配置，请在环境变量中设置NEXT_PUBLIC_SUPABASE_URL和NEXT_PUBLIC_SUPABASE_ANON_KEY');
     }
 
     const supabase = getSupabaseClient();
     if (!supabase) {
       console.warn('Supabase 客户端未初始化，跳过上传加密历史');
-      return false;
+      throw new Error('Supabase客户端初始化失败');
     }
 
     const historyPath = getUserHistoryPath(userId);

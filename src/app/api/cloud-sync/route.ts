@@ -19,22 +19,38 @@ export async function POST(request: NextRequest) {
     const { action, users, history, userId } = body;
 
     if (action === 'upload') {
-      // 分别上传用户列表和用户加密历史
-      const usersResult = await uploadUsers(users || []);
-      const historyResult = await uploadUserHistory(userId || 'unknown', history || []);
+      console.log('📤 [cloud-sync] 开始上传，userId:', userId);
+      console.log('📤 [cloud-sync] 用户数量:', users?.length || 0);
+      console.log('📤 [cloud-sync] 加密历史数量:', history?.length || 0);
 
-      if (!usersResult || !historyResult) {
+      try {
+        // 分别上传用户列表和用户加密历史
+        const usersResult = await uploadUsers(users || []);
+        const historyResult = await uploadUserHistory(userId || 'unknown', history || []);
+
+        console.log('📤 [cloud-sync] 用户列表上传结果:', usersResult);
+        console.log('📤 [cloud-sync] 加密历史上传结果:', historyResult);
+
+        if (!usersResult || !historyResult) {
+          return NextResponse.json<SyncResult>({
+            success: false,
+            message: '上传云端失败，请检查服务器日志',
+          });
+        }
+
+        return NextResponse.json<SyncResult>({
+          success: true,
+          message: `已上传 ${users?.length || 0} 个用户和 ${history?.length || 0} 条加密记录到云端`,
+          uploaded: true,
+        });
+      } catch (uploadError) {
+        console.error('❌ [cloud-sync] 上传过程抛出异常:', uploadError);
+        const errorMessage = uploadError instanceof Error ? uploadError.message : '未知错误';
         return NextResponse.json<SyncResult>({
           success: false,
-          message: '上传云端失败',
+          message: `上传云端失败: ${errorMessage}`,
         });
       }
-
-      return NextResponse.json<SyncResult>({
-        success: true,
-        message: `已上传 ${users?.length || 0} 个用户和 ${history?.length || 0} 条加密记录到云端`,
-        uploaded: true,
-      });
     }
 
     if (action === 'download') {
