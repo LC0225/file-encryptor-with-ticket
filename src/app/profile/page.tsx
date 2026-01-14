@@ -43,50 +43,27 @@ export default function Profile() {
   const [syncMessageType, setSyncMessageType] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        // 登录检查
-        if (!isLoggedIn()) {
-          router.replace('/login');
-          return;
-        }
+    // 登录检查
+    if (!isLoggedIn()) {
+      router.push('/login');
+      return;
+    }
 
-        // 先从localStorage快速加载用户信息
-        try {
-          const authLocalStorage = await import('@/utils/authLocalStorage');
-          const localUser = await authLocalStorage.getCurrentUser();
-          if (localUser) {
-            setCurrentUser(localUser);
-          }
-        } catch (error) {
-          console.log('从localStorage读取用户失败');
-        }
-
-        // 异步获取用户信息，不阻塞页面
-        getCurrentUser().then(user => {
-          if (user) {
-            setCurrentUser(user);
-          }
-        }).catch(error => {
-          console.error('加载用户信息失败:', error);
-        });
-
-        // 加载历史记录
-        loadHistory();
-
-        // 初始化同步状态（不阻塞）
-        initSyncStatus().then(() => {
-          setSyncStatus(getSyncStatus());
-        }).catch(error => {
-          console.error('初始化同步状态失败:', error);
-        });
-      } catch (error) {
-        console.error('初始化个人中心失败:', error);
-        router.replace('/login');
-      }
+    // 加载用户信息
+    const loadUser = async () => {
+      const user = await getCurrentUser();
+      setCurrentUser(user);
     };
+    loadUser();
 
-    init();
+    loadHistory();
+
+    // 初始化同步状态
+    const initSync = async () => {
+      await initSyncStatus();
+      setSyncStatus(getSyncStatus());
+    };
+    initSync();
   }, [router]);
 
   const loadHistory = () => {
@@ -96,9 +73,9 @@ export default function Profile() {
   const handleCopyTicket = async (ticket: string) => {
     const success = await copyToClipboard(ticket);
     if (success) {
-      showToast('Ticket已复制到剪贴板', 'success');
+      showToast({ type: 'success', message: 'Ticket已复制到剪贴板', duration: 2000 });
     } else {
-      showToast('复制失败，请手动复制', 'error');
+      showToast({ type: 'error', message: '复制失败，请手动复制', duration: 3000 });
     }
   };
 

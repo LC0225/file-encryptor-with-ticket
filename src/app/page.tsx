@@ -36,59 +36,23 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [isInitializing, setIsInitializing] = useState(true); // 初始化状态
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
 
-  // 登录检查（优先执行，快速从localStorage读取）
+  // 加载用户信息
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // 首先检查是否已登录
-        if (!isLoggedIn()) {
-          router.replace('/login');
-          return;
-        }
-
-        // 先尝试从localStorage快速读取用户信息（避免API超时）
-        try {
-          // 直接导入并调用authLocalStorage的getCurrentUser
-          const authLocalStorage = await import('@/utils/authLocalStorage');
-          const localUser = await authLocalStorage.getCurrentUser();
-          if (localUser) {
-            setCurrentUser(localUser);
-            setIsInitializing(false);
-            // 后台尝试同步，但不阻塞页面
-            getCurrentUser().then(apiUser => {
-              if (apiUser) {
-                setCurrentUser(apiUser);
-              }
-            }).catch(err => {
-              console.log('后台同步用户信息失败，使用本地数据');
-            });
-            return;
-          }
-        } catch (error) {
-          console.log('从localStorage读取用户失败，尝试API');
-        }
-
-        // 只有在本地没有数据时才调用API
-        const user = await getCurrentUser();
-        if (user) {
-          setCurrentUser(user);
-          setIsInitializing(false);
-        } else {
-          router.replace('/login');
-        }
-      } catch (error) {
-        console.error('登录检查失败:', error);
-        // 出错时直接跳转到登录页，避免阻塞
-        router.replace('/login');
-      }
+    const loadUser = async () => {
+      const user = await getCurrentUser();
+      setCurrentUser(user);
     };
+    loadUser();
+  }, []);
 
-    // 立即执行，不等待requestAnimationFrame
-    checkAuth();
+  // 登录检查
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.push('/login');
+    }
   }, [router]);
 
   // 从session storage读取ticket
@@ -299,18 +263,6 @@ export default function Home() {
     if (fileType.includes('audio')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
     return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   };
-
-  // 显示加载状态
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">加载中...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -576,7 +528,7 @@ export default function Home() {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(item.ticket);
-                            showToast('Ticket已复制到剪贴板', 'success');
+                            showToast({ type: 'success', message: 'Ticket已复制到剪贴板', duration: 2000 });
                           }}
                           className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                         >

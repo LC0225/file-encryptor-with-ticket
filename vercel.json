@@ -2,5 +2,6 @@
   "buildCommand": "yarn build",
   "devCommand": "yarn dev",
   "installCommand": "yarn install",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "regions": ["hkg1"]
 }

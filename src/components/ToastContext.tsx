@@ -1,71 +1,46 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
-
-export interface ToastMessage {
-  id: string;
-  type: 'success' | 'error' | 'info';
-  message: string;
-}
+import { createContext, useContext, useState, ReactNode } from 'react';
+import { Toast, type Toast as ToastType } from './Toast';
 
 interface ToastContextType {
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
-  toasts: ToastMessage[];
-  removeToast: (id: string) => void;
+  showToast: (toast: Omit<ToastType, 'id'>) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
+}
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Date.now().toString();
-    setToasts((prev) => [...prev, { id, type, message }]);
+interface ToastProviderProps {
+  children: ReactNode;
+}
 
-    // 3秒后自动移除
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 3000);
-  }, []);
+export function ToastProvider({ children }: ToastProviderProps) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
+  const showToast = (toast: Omit<ToastType, 'id'>) => {
+    const id = Date.now().toString() + Math.random();
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+
+  const handleClose = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   return (
-    <ToastContext.Provider value={{ showToast, toasts, removeToast }}>
+    <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+      <div className="fixed right-4 top-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`flex items-center gap-2 rounded-lg px-4 py-3 shadow-lg ${
-              toast.type === 'success'
-                ? 'bg-green-500 text-white'
-                : toast.type === 'error'
-                ? 'bg-red-500 text-white'
-                : 'bg-blue-500 text-white'
-            }`}
-          >
-            <span className="text-sm font-medium">{toast.message}</span>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="ml-2 text-white/80 hover:text-white"
-            >
-              ×
-            </button>
-          </div>
+          <Toast key={toast.id} toast={toast} onClose={handleClose} />
         ))}
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  const context = useContext(ToastContext);
-  if (context === undefined) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
 }

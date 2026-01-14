@@ -134,60 +134,37 @@ export function logoutUser(): void {
 export async function getCurrentUser(): Promise<User | null> {
   if (typeof window === 'undefined') return null;
 
-  try {
-    // 优先检查localStorage，快速返回
+  if (canUseDatabase()) {
     try {
-      const localUser = await authLocalStorage.getCurrentUser();
-      if (localUser) {
-        return localUser;
-      }
-    } catch (error) {
-      console.log('localStorage读取失败，尝试API');
-    }
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return null;
 
-    // 如果localStorage没有数据，才尝试API
-    if (canUseDatabase()) {
-      try {
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (!token) return null;
+      const response = await fetch('/api/auth/user', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-        // 添加超时控制 - 缩短到1秒，快速回退
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1000); // 1秒超时
-
-        const response = await fetch('/api/auth/user', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.status === 401) {
-          // Token无效，清除本地存储
-          localStorage.removeItem(TOKEN_KEY);
-          return null;
-        }
-
-        const data = await response.json();
-        if (data.success) {
-          return data.user;
-        }
-
+      if (response.status === 401) {
+        // Token无效，清除本地存储
+        localStorage.removeItem(TOKEN_KEY);
         return null;
-      } catch (error) {
-        console.log('API请求超时或失败，回退到localStorage');
-        // 如果数据库失败，回退到localStorage
       }
-    }
 
-    // 使用localStorage方案
-    return await authLocalStorage.getCurrentUser();
-  } catch (error) {
-    console.error('获取当前用户失败:', error);
-    return null;
+      const data = await response.json();
+      if (data.success) {
+        return data.user;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('获取当前用户失败（数据库），回退到localStorage:', error);
+      // 如果数据库失败，回退到localStorage
+    }
   }
+  
+  // 使用localStorage方案
+  return authLocalStorage.getCurrentUser();
 }
 
 /**
@@ -217,15 +194,10 @@ export function isAdmin(): boolean {
  * 检查是否已登录
  */
 export function isLoggedIn(): boolean {
-  try {
-    if (typeof window === 'undefined') return false;
-
-    // 检查token或localStorage会话
-    return !!localStorage.getItem(TOKEN_KEY) || authLocalStorage.isLoggedIn();
-  } catch (error) {
-    console.error('检查登录状态失败:', error);
-    return false;
-  }
+  if (typeof window === 'undefined') return false;
+  
+  // 检查token或localStorage会话
+  return !!localStorage.getItem(TOKEN_KEY) || authLocalStorage.isLoggedIn();
 }
 
 /**

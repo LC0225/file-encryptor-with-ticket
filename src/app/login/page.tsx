@@ -18,16 +18,14 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // 初始化管理员账号（不阻塞登录）
-      initAdminUser().catch(err => {
-        console.log('初始化管理员账号失败（非关键）:', err);
-      });
+      // 初始化管理员账号
+      await initAdminUser();
 
       // 登录
       const result = await loginUser(username, password);
-
+      
       if (result.success) {
-        router.replace('/');
+        router.push('/');
       } else {
         setError(result.message);
       }
