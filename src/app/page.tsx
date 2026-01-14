@@ -9,14 +9,16 @@ import {
   decryptFile,
   generateTicket,
 } from '@/utils/crypto';
-import { encryptFileWithWorker } from '@/utils/cryptoWorker';
+import { encryptFileWithWorker, convertToBase64, type WorkerEncryptionResult } from '@/utils/cryptoWorker';
 import { addEncryptionHistory } from '@/utils/storage';
 import { getCurrentUser, logoutUser, isLoggedIn, isAdmin } from '@/utils/auth';
 import { useToast } from '@/components/ToastContext';
 
 interface EncryptedFileResult {
-  encryptedData: string;
-  iv: string;
+  encryptedData: Uint8Array;
+  encryptedDataBase64: string;
+  iv: Uint8Array;
+  ivBase64: string;
   fileName: string;
   fileType: string;
   ticket: string;
@@ -128,9 +130,14 @@ export default function Home() {
           }
         );
 
+        // 转换为base64（仅用于历史记录和下载）
+        const base64Result = convertToBase64(result);
+
         const encryptedResult: EncryptedFileResult = {
           encryptedData: result.encryptedData,
+          encryptedDataBase64: base64Result.encryptedData,
           iv: result.iv,
+          ivBase64: base64Result.iv,
           fileName: files[0].name,
           fileType: files[0].type,
           ticket: ticketToUse,
@@ -140,10 +147,10 @@ export default function Home() {
         };
         setEncryptedFiles([encryptedResult]);
 
-        // 保存到历史记录
+        // 保存到历史记录（不保存加密数据，只保存元数据）
         addEncryptionHistory({
-          encryptedData: result.encryptedData,
-          iv: result.iv,
+          encryptedData: '',
+          iv: '',
           fileName: files[0].name,
           fileType: files[0].type,
           algorithm: 'AES-GCM'
@@ -171,9 +178,14 @@ export default function Home() {
             }
           );
 
+          // 转换为base64（仅用于下载）
+          const base64Result = convertToBase64(result);
+
           results.push({
             encryptedData: result.encryptedData,
+            encryptedDataBase64: base64Result.encryptedData,
             iv: result.iv,
+            ivBase64: base64Result.iv,
             fileName: file.name,
             fileType: file.type,
             ticket: fileTicket,
@@ -181,10 +193,11 @@ export default function Home() {
             fileSize: file.size,
             createdAt: new Date().toISOString(),
           });
-          // 保存到历史记录
+
+          // 保存到历史记录（不保存加密数据）
           addEncryptionHistory({
-            encryptedData: result.encryptedData,
-            iv: result.iv,
+            encryptedData: '',
+            iv: '',
             fileName: file.name,
             fileType: file.type,
             algorithm: 'AES-GCM'
@@ -238,9 +251,14 @@ export default function Home() {
           }
         );
 
+        // 转换为base64（仅用于历史记录和下载）
+        const base64Result = convertToBase64(result);
+
         const encryptedResult: EncryptedFileResult = {
           encryptedData: result.encryptedData,
+          encryptedDataBase64: base64Result.encryptedData,
           iv: result.iv,
+          ivBase64: base64Result.iv,
           fileName: files[0].name,
           fileType: files[0].type,
           ticket: ticketToUse,
@@ -250,10 +268,10 @@ export default function Home() {
         };
         setEncryptedFiles([encryptedResult]);
 
-        // 保存到历史记录
+        // 保存到历史记录（不保存加密数据，只保存元数据）
         addEncryptionHistory({
-          encryptedData: result.encryptedData,
-          iv: result.iv,
+          encryptedData: '',
+          iv: '',
           fileName: files[0].name,
           fileType: files[0].type,
           algorithm: 'AES-CBC'
@@ -281,9 +299,14 @@ export default function Home() {
             }
           );
 
+          // 转换为base64（仅用于下载）
+          const base64Result = convertToBase64(result);
+
           results.push({
             encryptedData: result.encryptedData,
+            encryptedDataBase64: base64Result.encryptedData,
             iv: result.iv,
+            ivBase64: base64Result.iv,
             fileName: file.name,
             fileType: file.type,
             ticket: fileTicket,
@@ -291,10 +314,11 @@ export default function Home() {
             fileSize: file.size,
             createdAt: new Date().toISOString(),
           });
-          // 保存到历史记录
+
+          // 保存到历史记录（不保存加密数据）
           addEncryptionHistory({
-            encryptedData: result.encryptedData,
-            iv: result.iv,
+            encryptedData: '',
+            iv: '',
             fileName: file.name,
             fileType: file.type,
             algorithm: 'AES-CBC'
@@ -458,8 +482,8 @@ export default function Home() {
   const downloadEncryptedFile = (item: EncryptedFileResult) => {
     const content = JSON.stringify(
       {
-        data: item.encryptedData,
-        iv: item.iv,
+        data: item.encryptedDataBase64,
+        iv: item.ivBase64,
         fileName: item.fileName,
         fileType: item.fileType,
         algorithm: item.algorithm,
