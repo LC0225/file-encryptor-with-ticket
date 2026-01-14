@@ -49,8 +49,6 @@ function uint8ArrayToBase64(array: Uint8Array): string {
 
 // Worker代码（内联）
 const workerCode = `
-const MAX_FILE_SIZE_FOR_ENCRYPTION = 50 * 1024 * 1024; // 50MB以下不分块加密
-
 /**
  * 从ticket生成AES-GCM加密密钥
  */
@@ -124,57 +122,6 @@ async function encryptChunk(chunkData, algorithm, ticket) {
   return {
     encryptedData: new Uint8Array(encryptedData),
     iv: iv
-  };
-}
-
-/**
- * 分块加密文件（保留用于向后兼容，但不推荐使用）
- */
-async function encryptFileChunked(fileData, algorithm, ticket, onProgress) {
-  const totalChunks = Math.ceil(fileData.byteLength / MAX_FILE_SIZE_FOR_ENCRYPTION);
-  let encryptedChunks = [];
-  let ivs = []; // 保存所有块的IV
-
-  // 分块加密
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * MAX_FILE_SIZE_FOR_ENCRYPTION;
-    const end = Math.min(start + MAX_FILE_SIZE_FOR_ENCRYPTION, fileData.byteLength);
-    const chunk = fileData.slice(start, end);
-
-    const result = await encryptFile(chunk, algorithm, ticket);
-    encryptedChunks.push(result.encryptedData);
-    ivs.push(result.iv); // 保存每个块的IV
-
-    // 报告进度
-    if (onProgress) {
-      onProgress({
-        progress: ((i + 1) / totalChunks) * 100,
-        currentChunk: i + 1,
-        totalChunks
-      });
-    }
-  }
-
-  // 合并所有加密块
-  const totalEncryptedLength = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const combinedData = new Uint8Array(totalEncryptedLength);
-  let offset = 0;
-  for (const chunk of encryptedChunks) {
-    combinedData.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  // 合并所有IV（每个块一个IV）
-  const ivLength = ivs[0].length;
-  const combinedIVs = new Uint8Array(ivs.length * ivLength);
-  for (let i = 0; i < ivs.length; i++) {
-    combinedIVs.set(ivs[i], i * ivLength);
-  }
-
-  return {
-    encryptedData: combinedData,
-    iv: combinedIVs, // 返回所有合并的IV
-    chunkCount: totalChunks
   };
 }
 
