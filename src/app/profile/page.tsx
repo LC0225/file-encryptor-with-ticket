@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { EncryptionHistory } from '@/types';
 import {
   getEncryptionHistory,
   deleteEncryptionHistory,
@@ -29,7 +30,7 @@ import { useToast } from '@/components/ToastContext';
 export default function Profile() {
   const router = useRouter();
   const { showToast } = useToast();
-  const [history, setHistory] = useState<ReturnType<typeof getEncryptionHistory>>([]);
+  const [history, setHistory] = useState<EncryptionHistory[]>([]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
@@ -73,8 +74,9 @@ export default function Profile() {
     initSync();
   }, [router]);
 
-  const loadHistory = () => {
-    setHistory(getEncryptionHistory());
+  const loadHistory = async () => {
+    const historyData = await getEncryptionHistory();
+    setHistory(historyData);
   };
 
   const handleCopyTicket = async (ticket: string) => {
@@ -100,19 +102,19 @@ export default function Profile() {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedItem) {
-      deleteEncryptionHistory(selectedItem);
-      loadHistory();
+      await deleteEncryptionHistory(selectedItem);
+      await loadHistory();
     }
     setShowDeleteModal(false);
     setSelectedItem(null);
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (confirm('确定要清空所有加密历史记录吗？此操作不可恢复。')) {
-      clearEncryptionHistory();
-      loadHistory();
+      await clearEncryptionHistory();
+      await loadHistory();
     }
   };
 

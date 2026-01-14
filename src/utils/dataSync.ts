@@ -1,9 +1,31 @@
 import { User } from './authLocalStorage';
+import { getCurrentUser } from './auth';
 import { EncryptionHistory } from '@/types';
 import type { AppData, SyncResult, SyncStatus } from '@/types';
 
 // 同步状态（存储在 localStorage）
 const SYNC_STATUS_KEY = 'crypto_sync_status';
+
+/**
+ * 获取用户特定的存储键
+ */
+function getUserStorageKey(userId: string): string {
+  return `encryption_history_${userId}`;
+}
+
+/**
+ * 获取当前用户的加密历史键
+ */
+async function getCurrentUserHistoryKey(): Promise<string> {
+  if (typeof window === 'undefined') return 'encryption_history';
+
+  const user = await getCurrentUser();
+  if (user && user.id) {
+    return getUserStorageKey(user.id);
+  }
+
+  return 'encryption_history';
+}
 
 /**
  * 获取同步状态
@@ -43,7 +65,7 @@ function updateSyncStatus(updates: Partial<SyncStatus>): void {
 /**
  * 从 localStorage 获取本地数据
  */
-function getLocalData(): AppData {
+async function getLocalData(): Promise<AppData> {
   const version = Date.now();
 
   // 获取用户数据
@@ -55,10 +77,11 @@ function getLocalData(): AppData {
     console.error('读取本地用户数据失败:', error);
   }
 
-  // 获取加密历史
+  // 获取加密历史（用户特定的）
   let history: EncryptionHistory[] = [];
   try {
-    const historyData = localStorage.getItem('encryption_history');
+    const historyKey = await getCurrentUserHistoryKey();
+    const historyData = localStorage.getItem(historyKey);
     history = historyData ? JSON.parse(historyData) : [];
   } catch (error) {
     console.error('读取本地加密历史失败:', error);
@@ -70,15 +93,16 @@ function getLocalData(): AppData {
 /**
  * 将云端数据应用到 localStorage
  */
-function applyCloudDataToLocal(data: AppData): void {
+async function applyCloudDataToLocal(data: AppData): Promise<void> {
   if (typeof window === 'undefined') return;
 
   try {
     // 保存用户数据
     localStorage.setItem('crypto_users', JSON.stringify(data.users));
 
-    // 保存加密历史
-    localStorage.setItem('encryption_history', JSON.stringify(data.history));
+    // 保存加密历史（用户特定的）
+    const historyKey = await getCurrentUserHistoryKey();
+    localStorage.setItem(historyKey, JSON.stringify(data.history));
   } catch (error) {
     console.error('应用云端数据失败:', error);
     throw error;
@@ -132,7 +156,7 @@ export async function syncFromCloud(): Promise<SyncResult> {
 
     // 比较版本，云端更新则使用云端数据
     if (result.cloudData.version > localVersion) {
-      applyCloudDataToLocal(result.cloudData);
+      await applyCloudDataToLocal(result.cloudData);
       updateSyncStatus({ lastSyncTime: result.cloudData.version });
 
       return {
@@ -167,7 +191,7 @@ export async function syncToCloud(): Promise<SyncResult> {
     updateSyncStatus({ syncing: true });
 
     // 获取本地数据
-    const localData = getLocalData();
+    const localData = await getLocalData();
 
     // 通过 API 上传到云端
     const response = await fetch('/api/cloud-sync', {

@@ -241,7 +241,7 @@ export default function Home() {
         setEncryptedFiles([encryptedResult]);
 
         // 保存到历史记录（不保存加密数据，只保存元数据）
-        addEncryptionHistory({
+        await addEncryptionHistory({
           encryptedData: '',
           iv: '',
           fileName: files[0].name,
@@ -303,7 +303,7 @@ export default function Home() {
           });
 
           // 保存到历史记录（不保存加密数据）
-          addEncryptionHistory({
+          await addEncryptionHistory({
             encryptedData: '',
             iv: '',
             fileName: file.name,
@@ -404,7 +404,7 @@ export default function Home() {
         setEncryptedFiles([encryptedResult]);
 
         // 保存到历史记录（不保存加密数据，只保存元数据）
-        addEncryptionHistory({
+        await addEncryptionHistory({
           encryptedData: '',
           iv: '',
           fileName: files[0].name,
@@ -466,7 +466,7 @@ export default function Home() {
           });
 
           // 保存到历史记录（不保存加密数据）
-          addEncryptionHistory({
+          await addEncryptionHistory({
             encryptedData: '',
             iv: '',
             fileName: file.name,
