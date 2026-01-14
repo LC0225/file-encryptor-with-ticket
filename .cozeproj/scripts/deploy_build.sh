@@ -4,9 +4,9 @@ set -Eeuo pipefail
 cd "${COZE_WORKSPACE_PATH}"
 
 echo "Installing dependencies..."
-pnpm install
+yarn install
 
 echo "Building the project..."
-pnpm run build
+yarn run build
 
 echo "Build completed successfully!"
