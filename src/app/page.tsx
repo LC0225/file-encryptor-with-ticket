@@ -638,9 +638,9 @@ export default function Home() {
         // 对于大文件，直接使用 Uint8Array，避免 base64 转换
         console.log('使用 Uint8Array 直接解密（避免 base64 转换）...');
 
-        // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
-        if (algorithm === 'AES-GCM') {
-          setError('此文件使用AES-GCM加密，请点击左侧的"解密（AES-GCM）"按钮');
+        // 检查算法是否匹配（用户点击的是AES-GCM解密）
+        if (algorithm !== 'AES-GCM') {
+          setError(`此文件使用${algorithm}加密，请点击"${algorithm}解密"按钮`);
           setLoading(false);
           setShowProgress(false);
           return;
@@ -651,7 +651,7 @@ export default function Home() {
           encryptedBytes,
           ivBytes,
           ticket,
-          'AES-CBC',
+          'AES-GCM',
           (progress) => {
             setEncryptionProgress(progress);
             setProcessedBytes((progress.progress / 100) * encryptedBytes.length);
@@ -664,7 +664,7 @@ export default function Home() {
           fileType: fileType,
         });
 
-        setSuccess('AES-CBC文件解密成功！');
+        setSuccess('AES-GCM文件解密成功！');
         setLoading(false);
         setShowProgress(false);
         setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
