@@ -10,6 +10,7 @@ export interface User {
 }
 
 const TOKEN_KEY = 'crypto_auth_token';
+const SESSION_KEY = 'crypto_session';
 
 /**
  * 密码要求检查
@@ -86,6 +87,18 @@ export async function loginUser(
   username: string,
   password: string
 ): Promise<{ success: boolean; message: string; user?: User }> {
+  // 首先尝试 localStorage 登录（优先级更高，因为更可靠）
+  try {
+    const result = await authLocalStorage.loginUser(username, password);
+    if (result.success) {
+      console.log('✅ 通过 localStorage 登录成功:', result.user?.username);
+      return result;
+    }
+  } catch (error) {
+    console.log('⚠️ localStorage 登录失败，尝试 API 登录');
+  }
+
+  // 如果 localStorage 登录失败（或用户不存在），尝试 API 登录
   if (canUseDatabase()) {
     try {
       const response = await fetch('/api/auth/login', {
@@ -98,9 +111,12 @@ export async function loginUser(
 
       const data = await response.json();
 
+      console.log('📝 API登录响应:', data);
+
       if (data.success && data.token) {
         // 保存token到localStorage
         localStorage.setItem(TOKEN_KEY, data.token);
+        console.log('✅ 已保存 token 到 localStorage');
 
         // 同时保存session到localStorage（用于 getCurrentUser）
         if (data.user) {
@@ -110,7 +126,10 @@ export async function loginUser(
             role: data.user.role,
             loginTime: new Date().toISOString(),
           };
-          localStorage.setItem('crypto_session', JSON.stringify(session));
+          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+          console.log('✅ 已保存 session 到 localStorage:', session.username);
+        } else {
+          console.warn('⚠️ API返回的数据中缺少user字段');
         }
 
         return { success: true, message: data.message, user: data.user };
@@ -118,13 +137,12 @@ export async function loginUser(
 
       return data;
     } catch (error) {
-      console.error('登录失败（数据库），回退到localStorage:', error);
-      // 如果数据库失败，回退到localStorage
+      console.error('登录失败（数据库）:', error);
+      return { success: false, message: '登录失败，请重试' };
     }
   }
-  
-  // 使用localStorage方案
-  return authLocalStorage.loginUser(username, password);
+
+  return { success: false, message: '登录失败' };
 }
 
 /**
@@ -183,7 +201,7 @@ export async function getCurrentUser(): Promise<User | null> {
         role: tokenData.role || 'user',
         loginTime: tokenData.loginTime || new Date().toISOString(),
       };
-      localStorage.setItem('crypto_session', JSON.stringify(session));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
       console.log('✅ 已从token恢复session，重新获取用户');
       return authLocalStorage.getCurrentUser();
     }
@@ -219,7 +237,7 @@ export async function getCurrentUser(): Promise<User | null> {
           role: data.user.role,
           loginTime: new Date().toISOString(),
         };
-        localStorage.setItem('crypto_session', JSON.stringify(session));
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
         return data.user;
       }
 
@@ -238,128 +256,19 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 /**
- * 检查是否为管理员
- */
-export function isAdmin(): boolean {
-  if (typeof window === 'undefined') return false;
-  
-  // 先检查token中的角色（如果是数据库方案）
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    try {
-      const sessionData = JSON.parse(atob(token));
-      if (sessionData.role === 'admin') {
-        return true;
-      }
-    } catch (error) {
-      // 解析失败，继续使用localStorage检查
-    }
-  }
-  
-  // 使用localStorage检查
-  return authLocalStorage.isAdmin();
-}
-
-/**
- * 检查是否已登录
+ * 检查用户是否已登录
  */
 export function isLoggedIn(): boolean {
   if (typeof window === 'undefined') return false;
-  
-  // 检查token或localStorage会话
-  return !!localStorage.getItem(TOKEN_KEY) || authLocalStorage.isLoggedIn();
+  const token = localStorage.getItem(TOKEN_KEY);
+  const session = localStorage.getItem(SESSION_KEY);
+  return !!(token || session);
 }
 
 /**
- * 获取Auth token（用于API调用）
+ * 检查用户是否是管理员
  */
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-/**
- * 从token中解析用户信息（服务器端使用）
- * @param token - 认证token
- * @returns 用户信息或null
- */
-export function getCurrentUserFromToken(token: string): User | null {
-  try {
-    // 解析base64编码的token
-    const sessionData = JSON.parse(atob(token));
-    return {
-      id: sessionData.id,
-      username: sessionData.username,
-      email: sessionData.email,
-      role: sessionData.role,
-    };
-  } catch (error) {
-    console.error('解析token失败:', error);
-    return null;
-  }
-}
-
-/**
- * 获取所有用户（仅管理员）
- */
-export async function getAllUsers(): Promise<User[]> {
-  if (canUseDatabase()) {
-    try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) return [];
-
-      const response = await fetch('/api/admin/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        return [];
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        return data.users;
-      }
-
-      return [];
-    } catch (error) {
-      console.error('获取用户列表失败（数据库），回退到localStorage:', error);
-      // 如果数据库失败，回退到localStorage
-    }
-  }
-  
-  // 使用localStorage方案
-  return authLocalStorage.getAllUsers();
-}
-
-/**
- * 删除用户（仅管理员）
- */
-export async function deleteUser(userId: string): Promise<{ success: boolean; message: string }> {
-  if (canUseDatabase()) {
-    try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) {
-        return { success: false, message: '未登录' };
-      }
-
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('删除用户失败（数据库），回退到localStorage:', error);
-      // 如果数据库失败，回退到localStorage
-    }
-  }
-  
-  // 使用localStorage方案
-  return authLocalStorage.deleteUser(userId);
+export async function isAdmin(): Promise<boolean> {
+  const user = await getCurrentUser();
+  return user?.role === 'admin';
 }
