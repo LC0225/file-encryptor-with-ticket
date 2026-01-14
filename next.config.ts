@@ -5,9 +5,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // 静态导出：不需要服务器，加载更快
-  output: 'export',
-  // 禁用服务器端功能，因为我们使用localStorage
+  // URL末尾添加斜杠，确保路由一致性
   trailingSlash: true,
 };
 
