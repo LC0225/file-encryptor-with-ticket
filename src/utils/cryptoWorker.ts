@@ -11,6 +11,7 @@ export interface EncryptionProgress {
 export interface WorkerEncryptionResult {
   encryptedData: Uint8Array;
   iv: Uint8Array;
+  chunkCount: number; // 块的数量
 }
 
 export interface WorkerEncryptionResultBase64 {
@@ -48,7 +49,7 @@ function uint8ArrayToBase64(array: Uint8Array): string {
 
 // Worker代码（内联）
 const workerCode = `
-const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB每块
+const MAX_FILE_SIZE_FOR_ENCRYPTION = 50 * 1024 * 1024; // 50MB以下不分块加密
 
 /**
  * 从ticket生成AES-GCM加密密钥
@@ -60,7 +61,7 @@ async function deriveKeyGCM(ticket) {
     encoder.encode(ticket),
     'PBKDF2',
     false,
-    ['deriveKey']
+    ['deriveKey', 'decrypt']
   );
 
   return crypto.subtle.deriveKey(
@@ -73,7 +74,7 @@ async function deriveKeyGCM(ticket) {
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt']
+    ['encrypt', 'decrypt']
   );
 }
 
@@ -87,7 +88,7 @@ async function deriveKeyCBC(ticket) {
     encoder.encode(ticket),
     'PBKDF2',
     false,
-    ['deriveKey']
+    ['deriveKey', 'decrypt']
   );
 
   return crypto.subtle.deriveKey(
@@ -100,7 +101,7 @@ async function deriveKeyCBC(ticket) {
     keyMaterial,
     { name: 'AES-CBC', length: 256 },
     false,
-    ['encrypt']
+    ['encrypt', 'decrypt']
   );
 }
 
@@ -127,26 +128,22 @@ async function encryptFile(fileData, algorithm, ticket) {
 }
 
 /**
- * 分块加密文件
+ * 分块加密文件（保留用于向后兼容，但不推荐使用）
  */
 async function encryptFileChunked(fileData, algorithm, ticket, onProgress) {
-  const totalChunks = Math.ceil(fileData.byteLength / CHUNK_SIZE);
+  const totalChunks = Math.ceil(fileData.byteLength / MAX_FILE_SIZE_FOR_ENCRYPTION);
   let encryptedChunks = [];
-  let iv;
+  let ivs = []; // 保存所有块的IV
 
   // 分块加密
   for (let i = 0; i < totalChunks; i++) {
-    const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, fileData.byteLength);
+    const start = i * MAX_FILE_SIZE_FOR_ENCRYPTION;
+    const end = Math.min(start + MAX_FILE_SIZE_FOR_ENCRYPTION, fileData.byteLength);
     const chunk = fileData.slice(start, end);
 
     const result = await encryptFile(chunk, algorithm, ticket);
     encryptedChunks.push(result.encryptedData);
-
-    // 保存第一块的IV（用于解密）
-    if (i === 0) {
-      iv = result.iv;
-    }
+    ivs.push(result.iv); // 保存每个块的IV
 
     // 报告进度
     if (onProgress) {
@@ -167,9 +164,17 @@ async function encryptFileChunked(fileData, algorithm, ticket, onProgress) {
     offset += chunk.length;
   }
 
+  // 合并所有IV（每个块一个IV）
+  const ivLength = ivs[0].length;
+  const combinedIVs = new Uint8Array(ivs.length * ivLength);
+  for (let i = 0; i < ivs.length; i++) {
+    combinedIVs.set(ivs[i], i * ivLength);
+  }
+
   return {
     encryptedData: combinedData,
-    iv: iv
+    iv: combinedIVs, // 返回所有合并的IV
+    chunkCount: totalChunks
   };
 }
 
@@ -187,13 +192,18 @@ self.addEventListener('message', async (e) => {
         data: { totalSize: fileData.byteLength }
       });
 
-      // 执行分块加密
-      const result = await encryptFileChunked(fileData, algorithm, ticket, (progress) => {
-        self.postMessage({
-          type: 'PROGRESS',
-          data: progress
-        });
-      });
+      // 直接加密整个文件（不分块）
+      const result = await encryptFile(fileData, algorithm, ticket);
+
+      // 发送完成消息 - 直接发送Uint8Array，不转base64
+      self.postMessage({
+        type: 'COMPLETE',
+        data: {
+          encryptedData: result.encryptedData,
+          iv: result.iv,
+          chunkCount: 1
+        }
+      }, [result.encryptedData.buffer, result.iv.buffer]); // Transferable Objects
 
       // 发送完成消息 - 直接发送Uint8Array，不转base64
       self.postMessage({
@@ -204,7 +214,7 @@ self.addEventListener('message', async (e) => {
         }
       }, [result.encryptedData.buffer, result.iv.buffer]); // Transferable Objects
     } else if (type === 'DECRYPT') {
-      // 解密功能（如果需要）
+      // 解密功能（不分块）
       const { encryptedData, iv, ticket, algorithm } = data;
 
       const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);

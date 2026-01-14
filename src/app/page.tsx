@@ -9,7 +9,12 @@ import {
   decryptFile,
   generateTicket,
 } from '@/utils/crypto';
-import { encryptFileWithWorker, convertToBase64, type WorkerEncryptionResult } from '@/utils/cryptoWorker';
+import {
+  encryptFileWithWorker,
+  decryptFileWithWorker,
+  convertToBase64,
+  type WorkerEncryptionResult
+} from '@/utils/cryptoWorker';
 import { addEncryptionHistory } from '@/utils/storage';
 import { getCurrentUser, logoutUser, isLoggedIn, isAdmin } from '@/utils/auth';
 import { useToast } from '@/components/ToastContext';
@@ -24,6 +29,7 @@ interface EncryptedFileResult {
   ticket: string;
   algorithm: 'AES-GCM' | 'AES-CBC';
   fileSize: number;
+  chunkCount?: number; // 分块数量
   createdAt?: string;
 }
 
@@ -143,6 +149,7 @@ export default function Home() {
           ticket: ticketToUse,
           algorithm: 'AES-GCM',
           fileSize: files[0].size,
+          chunkCount: result.chunkCount,
           createdAt: new Date().toISOString(),
         };
         setEncryptedFiles([encryptedResult]);
@@ -191,6 +198,7 @@ export default function Home() {
             ticket: fileTicket,
             algorithm: 'AES-GCM',
             fileSize: file.size,
+            chunkCount: result.chunkCount,
             createdAt: new Date().toISOString(),
           });
 
@@ -264,6 +272,7 @@ export default function Home() {
           ticket: ticketToUse,
           algorithm: 'AES-CBC',
           fileSize: files[0].size,
+          chunkCount: result.chunkCount,
           createdAt: new Date().toISOString(),
         };
         setEncryptedFiles([encryptedResult]);
@@ -312,6 +321,7 @@ export default function Home() {
             ticket: fileTicket,
             algorithm: 'AES-CBC',
             fileSize: file.size,
+            chunkCount: result.chunkCount,
             createdAt: new Date().toISOString(),
           });
 
@@ -387,19 +397,18 @@ export default function Home() {
         return;
       }
 
-      const result = await decryptFile(
+      // 使用Worker进行解密（支持分块解密）
+      const decryptedData = await decryptFileWithWorker(
         encryptedData,
         iv,
         ticket,
-        fileName,
-        fileType,
         'AES-GCM'
       );
 
       setDecryptedFile({
-        data: result.decryptedData,
-        fileName: result.fileName,
-        fileType: result.fileType,
+        data: new Blob([decryptedData.buffer as ArrayBuffer], { type: fileType }),
+        fileName: fileName,
+        fileType: fileType,
       });
 
       setSuccess('AES-GCM文件解密成功！');
@@ -456,19 +465,18 @@ export default function Home() {
         return;
       }
 
-      const result = await decryptFile(
+      // 使用Worker进行解密（支持分块解密）
+      const decryptedData = await decryptFileWithWorker(
         encryptedData,
         iv,
         ticket,
-        fileName,
-        fileType,
         'AES-CBC'
       );
 
       setDecryptedFile({
-        data: result.decryptedData,
-        fileName: result.fileName,
-        fileType: result.fileType,
+        data: new Blob([decryptedData.buffer as ArrayBuffer], { type: fileType }),
+        fileName: fileName,
+        fileType: fileType,
       });
 
       setSuccess('AES-CBC文件解密成功！');
@@ -487,6 +495,7 @@ export default function Home() {
         fileName: item.fileName,
         fileType: item.fileType,
         algorithm: item.algorithm,
+        chunkCount: item.chunkCount,
       },
       null,
       2
