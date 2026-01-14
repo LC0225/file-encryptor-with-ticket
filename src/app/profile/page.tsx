@@ -42,6 +42,7 @@ export default function Profile() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncMessageType, setSyncMessageType] = useState<'success' | 'error' | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 确保在客户端挂载后再渲染动态内容
   useEffect(() => {
@@ -155,6 +156,35 @@ export default function Profile() {
     }, 5000);
   };
 
+  // 高亮搜索关键词
+  const highlightText = (text: string, query: string) => {
+    if (!query) return text;
+
+    const regex = new RegExp(`(${query})`, 'gi');
+    const parts = text.split(regex);
+
+    return parts.map((part, index) => {
+      if (part.toLowerCase() === query.toLowerCase()) {
+        return (
+          <span key={index} className="text-red-600 dark:text-red-400 font-medium">
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
+  // 过滤历史记录
+  const filteredHistory = history.filter((item) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      item.fileName.toLowerCase().includes(query) ||
+      item.ticket.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {/* 导航栏 */}
@@ -238,19 +268,19 @@ export default function Profile() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl bg-white p-6 shadow dark:bg-gray-800">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                加密文件总数
+                {searchQuery ? '搜索结果' : '加密文件总数'}
               </div>
               <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                {history.length}
+                {searchQuery ? filteredHistory.length : history.length}
               </div>
             </div>
             <div className="rounded-xl bg-white p-6 shadow dark:bg-gray-800">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                总文件大小
+                {searchQuery ? '搜索结果总大小' : '总文件大小'}
               </div>
               <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                 {formatFileSize(
-                  history.reduce((sum, item) => sum + item.fileSize, 0)
+                  (searchQuery ? filteredHistory : history).reduce((sum, item) => sum + item.fileSize, 0)
                 )}
               </div>
             </div>
@@ -352,6 +382,60 @@ export default function Profile() {
             </p>
           </div>
 
+          {/* 搜索框 */}
+          {history.length > 0 && (
+            <div className="rounded-xl bg-white p-4 shadow dark:bg-gray-800">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="搜索文件名或ticket..."
+                  className="flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="flex items-center justify-center rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                    title="清除搜索"
+                  >
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {searchQuery && (
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  找到 {filteredHistory.length} 条结果
+                </p>
+              )}
+            </div>
+          )}
+
           {/* 历史记录列表 */}
           {history.length === 0 ? (
             <div className="rounded-xl bg-white p-12 text-center shadow dark:bg-gray-800">
@@ -385,111 +469,145 @@ export default function Profile() {
             </div>
           ) : (
             <div className="space-y-4">
-              {history.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl bg-white p-6 shadow dark:bg-gray-800"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {item.fileName}
-                        </h3>
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
-                          {getFileTypeLabel(item.fileType)}
-                        </span>
-                      </div>
-                      <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                        <p>文件大小：{formatFileSize(item.fileSize)}</p>
-                        <p>加密时间：{formatDate(item.createdAt)}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="ml-4 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                      title="删除记录"
+              {filteredHistory.length === 0 ? (
+                <div className="rounded-xl bg-white p-12 text-center shadow dark:bg-gray-800">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                    <svg
+                      className="h-8 w-8 text-gray-400 dark:text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    </button>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
                   </div>
-
-                  {/* Ticket区域 */}
-                  <div className="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Ticket（解密密钥）
-                      </span>
-                      <button
-                        onClick={() => handleCopyTicket(item.ticket)}
-                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        复制
-                      </button>
-                    </div>
-                    <code className="block break-all rounded bg-white p-3 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200">
-                      {item.ticket}
-                    </code>
-                  </div>
-
-                  {/* 操作按钮 */}
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      onClick={() => handleDownloadEncryptedFile(item)}
-                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                        />
-                      </svg>
-                      下载加密文件
-                    </button>
-                    <button
-                      onClick={() => {
-                        sessionStorage.setItem('decrypt_ticket', item.ticket);
-                        window.location.href = '/';
-                      }}
-                      className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                        />
-                      </svg>
-                      解密此文件
-                    </button>
-                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    未找到匹配结果
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    尝试使用不同的关键词搜索
+                  </p>
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
+                  >
+                    清除搜索
+                  </button>
                 </div>
-              ))}
+              ) : (
+                <>
+                  {filteredHistory.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl bg-white p-6 shadow dark:bg-gray-800"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              {highlightText(item.fileName, searchQuery)}
+                            </h3>
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
+                              {getFileTypeLabel(item.fileType)}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                            <p>文件大小：{formatFileSize(item.fileSize)}</p>
+                            <p>加密时间：{formatDate(item.createdAt)}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="ml-4 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          title="删除记录"
+                        >
+                          <svg
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Ticket区域 */}
+                      <div className="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Ticket（解密密钥）
+                          </span>
+                          <button
+                            onClick={() => handleCopyTicket(item.ticket)}
+                            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            复制
+                          </button>
+                        </div>
+                        <code className="block break-all rounded bg-white p-3 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+                          {searchQuery ? highlightText(item.ticket, searchQuery) : item.ticket}
+                        </code>
+                      </div>
+
+                      {/* 操作按钮 */}
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                          onClick={() => handleDownloadEncryptedFile(item)}
+                          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-700"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                            />
+                          </svg>
+                          下载加密文件
+                        </button>
+                        <button
+                          onClick={() => {
+                            sessionStorage.setItem('decrypt_ticket', item.ticket);
+                            window.location.href = '/';
+                          }}
+                          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                            />
+                          </svg>
+                          解密此文件
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
