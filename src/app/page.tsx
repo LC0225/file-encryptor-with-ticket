@@ -486,13 +486,58 @@ export default function Home() {
       let fileType: string;
       let algorithm: 'AES-GCM' | 'AES-CBC' = 'AES-GCM';
 
-      // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
-      const firstUint32 = fileView.getUint32(0, false);
-      const ivLength = firstUint32;
+      // 优先检查是否为 JSON 格式（查看第一个字符是否为 '{'）
+      const firstByte = fileView.getUint8(0);
+      const isJSON = firstByte === 0x7B; // '{' 的 ASCII 码
 
-      // 合理的IV长度：GCM是12字节，CBC是16字节
-      if (ivLength === 12 || ivLength === 16) {
-        // 二进制格式
+      if (isJSON) {
+        // JSON 格式（小文件）
+        const fileContent = await file.text();
+
+        try {
+          const jsonData = JSON.parse(fileContent);
+          if (!jsonData.data) {
+            throw new Error('加密文件中缺少加密数据（data字段）');
+          }
+          if (!jsonData.iv) {
+            throw new Error('加密文件中缺少IV（iv字段）');
+          }
+          if (jsonData.data.length === 0) {
+            throw new Error('加密数据为空（data字段为空字符串）');
+          }
+          if (jsonData.iv.length === 0) {
+            throw new Error('IV为空（iv字段为空字符串）');
+          }
+          encryptedData = jsonData.data;
+          iv = jsonData.iv;
+          fileName = jsonData.fileName;
+          fileType = jsonData.fileType || 'application/octet-stream';
+          algorithm = jsonData.algorithm || 'AES-GCM';
+        } catch (parseError) {
+          const errorMsg = (parseError as Error).message;
+          if (errorMsg.startsWith('JSON')) {
+            setError(`加密文件格式错误：不是有效的 JSON 格式。请确保选择了正确的 .encrypted 文件。`);
+          } else {
+            setError(`加密文件解析失败：${errorMsg}`);
+          }
+          setLoading(false);
+          setShowProgress(false);
+          return;
+        }
+      } else {
+        // 二进制格式（大文件）
+        // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
+        const firstUint32 = fileView.getUint32(0, false);
+        const ivLength = firstUint32;
+
+        // 合理的IV长度：GCM是12字节，CBC是16字节
+        if (ivLength !== 12 && ivLength !== 16) {
+          setError(`文件格式识别失败：既不是 JSON 格式也不是二进制格式。请确保选择了正确的 .encrypted 文件。`);
+          setLoading(false);
+          setShowProgress(false);
+          return;
+        }
+
         let offset = 0;
 
         // 读取IV
@@ -527,40 +572,6 @@ export default function Home() {
         // 转换为base64
         encryptedData = uint8ArrayToBase64(encryptedBytes);
         iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
-      } else {
-        // JSON格式
-        const fileContent = await file.text();
-
-        try {
-          const jsonData = JSON.parse(fileContent);
-          if (!jsonData.data) {
-            throw new Error('加密文件中缺少加密数据（data字段）');
-          }
-          if (!jsonData.iv) {
-            throw new Error('加密文件中缺少IV（iv字段）');
-          }
-          if (jsonData.data.length === 0) {
-            throw new Error('加密数据为空（data字段为空字符串）');
-          }
-          if (jsonData.iv.length === 0) {
-            throw new Error('IV为空（iv字段为空字符串）');
-          }
-          encryptedData = jsonData.data;
-          iv = jsonData.iv;
-          fileName = jsonData.fileName;
-          fileType = jsonData.fileType || 'application/octet-stream';
-          algorithm = jsonData.algorithm || 'AES-GCM';
-        } catch (parseError) {
-          const errorMsg = (parseError as Error).message;
-          if (errorMsg.startsWith('JSON')) {
-            setError(`加密文件格式错误：不是有效的 JSON 格式。请确保选择了正确的 .encrypted 文件。`);
-          } else {
-            setError(`加密文件解析失败：${errorMsg}`);
-          }
-          setLoading(false);
-          setShowProgress(false);
-          return;
-        }
       }
 
       // 如果文件是用AES-CBC加密的，提示用户使用AES-CBC解密
@@ -656,13 +667,58 @@ export default function Home() {
       let fileType: string;
       let algorithm: 'AES-GCM' | 'AES-CBC' = 'AES-CBC';
 
-      // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
-      const firstUint32 = fileView.getUint32(0, false);
-      const ivLength = firstUint32;
+      // 优先检查是否为 JSON 格式（查看第一个字符是否为 '{'）
+      const firstByte = fileView.getUint8(0);
+      const isJSON = firstByte === 0x7B; // '{' 的 ASCII 码
 
-      // 合理的IV长度：GCM是12字节，CBC是16字节
-      if (ivLength === 12 || ivLength === 16) {
-        // 二进制格式
+      if (isJSON) {
+        // JSON 格式（小文件）
+        const fileContent = await file.text();
+
+        try {
+          const jsonData = JSON.parse(fileContent);
+          if (!jsonData.data) {
+            throw new Error('加密文件中缺少加密数据（data字段）');
+          }
+          if (!jsonData.iv) {
+            throw new Error('加密文件中缺少IV（iv字段）');
+          }
+          if (jsonData.data.length === 0) {
+            throw new Error('加密数据为空（data字段为空字符串）');
+          }
+          if (jsonData.iv.length === 0) {
+            throw new Error('IV为空（iv字段为空字符串）');
+          }
+          encryptedData = jsonData.data;
+          iv = jsonData.iv;
+          fileName = jsonData.fileName;
+          fileType = jsonData.fileType || 'application/octet-stream';
+          algorithm = jsonData.algorithm || 'AES-CBC';
+        } catch (parseError) {
+          const errorMsg = (parseError as Error).message;
+          if (errorMsg.startsWith('JSON')) {
+            setError(`加密文件格式错误：不是有效的 JSON 格式。请确保选择了正确的 .encrypted 文件。`);
+          } else {
+            setError(`加密文件解析失败：${errorMsg}`);
+          }
+          setLoading(false);
+          setShowProgress(false);
+          return;
+        }
+      } else {
+        // 二进制格式（大文件）
+        // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
+        const firstUint32 = fileView.getUint32(0, false);
+        const ivLength = firstUint32;
+
+        // 合理的IV长度：GCM是12字节，CBC是16字节
+        if (ivLength !== 12 && ivLength !== 16) {
+          setError(`文件格式识别失败：既不是 JSON 格式也不是二进制格式。请确保选择了正确的 .encrypted 文件。`);
+          setLoading(false);
+          setShowProgress(false);
+          return;
+        }
+
         let offset = 0;
 
         // 读取IV
@@ -697,40 +753,6 @@ export default function Home() {
         // 转换为base64
         encryptedData = uint8ArrayToBase64(encryptedBytes);
         iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
-      } else {
-        // JSON格式
-        const fileContent = await file.text();
-
-        try {
-          const jsonData = JSON.parse(fileContent);
-          if (!jsonData.data) {
-            throw new Error('加密文件中缺少加密数据（data字段）');
-          }
-          if (!jsonData.iv) {
-            throw new Error('加密文件中缺少IV（iv字段）');
-          }
-          if (jsonData.data.length === 0) {
-            throw new Error('加密数据为空（data字段为空字符串）');
-          }
-          if (jsonData.iv.length === 0) {
-            throw new Error('IV为空（iv字段为空字符串）');
-          }
-          encryptedData = jsonData.data;
-          iv = jsonData.iv;
-          fileName = jsonData.fileName;
-          fileType = jsonData.fileType || 'application/octet-stream';
-          algorithm = jsonData.algorithm || 'AES-CBC';
-        } catch (parseError) {
-          const errorMsg = (parseError as Error).message;
-          if (errorMsg.startsWith('JSON')) {
-            setError(`加密文件格式错误：不是有效的 JSON 格式。请确保选择了正确的 .encrypted 文件。`);
-          } else {
-            setError(`加密文件解析失败：${errorMsg}`);
-          }
-          setLoading(false);
-          setShowProgress(false);
-          return;
-        }
       }
 
       // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
