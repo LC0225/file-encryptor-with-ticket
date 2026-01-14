@@ -431,8 +431,10 @@ export default function Home() {
     }
 
     setLoading(true);
+    setShowProgress(true);
     setError('');
     setSuccess('');
+    setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
 
     try {
       const file = files[0];
@@ -505,6 +507,7 @@ export default function Home() {
         } catch (parseError) {
           setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
           setLoading(false);
+          setShowProgress(false);
           return;
         }
       }
@@ -513,15 +516,19 @@ export default function Home() {
       if (algorithm === 'AES-CBC') {
         setError('此文件使用AES-CBC加密，请使用AES-CBC解密按钮');
         setLoading(false);
+        setShowProgress(false);
         return;
       }
 
-      // 使用Worker进行解密（支持分块解密）
+      // 使用Worker进行解密（支持分块解密和进度显示）
       const decryptedData = await decryptFileWithWorker(
         encryptedData,
         iv,
         ticket,
-        'AES-GCM'
+        'AES-GCM',
+        (progress) => {
+          setEncryptionProgress(progress);
+        }
       );
 
       setDecryptedFile({
@@ -535,6 +542,8 @@ export default function Home() {
       setError('AES-GCM解密失败：' + (err as Error).message);
     } finally {
       setLoading(false);
+      setShowProgress(false);
+      setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
     }
   };
 
@@ -550,8 +559,10 @@ export default function Home() {
     }
 
     setLoading(true);
+    setShowProgress(true);
     setError('');
     setSuccess('');
+    setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
 
     try {
       const file = files[0];
@@ -624,6 +635,7 @@ export default function Home() {
         } catch (parseError) {
           setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
           setLoading(false);
+          setShowProgress(false);
           return;
         }
       }
@@ -632,15 +644,19 @@ export default function Home() {
       if (algorithm === 'AES-GCM') {
         setError('此文件使用AES-GCM加密，请使用AES-GCM解密按钮');
         setLoading(false);
+        setShowProgress(false);
         return;
       }
 
-      // 使用Worker进行解密（支持分块解密）
+      // 使用Worker进行解密（支持分块解密和进度显示）
       const decryptedData = await decryptFileWithWorker(
         encryptedData,
         iv,
         ticket,
-        'AES-CBC'
+        'AES-CBC',
+        (progress) => {
+          setEncryptionProgress(progress);
+        }
       );
 
       setDecryptedFile({
@@ -654,6 +670,8 @@ export default function Home() {
       setError('AES-CBC解密失败：' + (err as Error).message);
     } finally {
       setLoading(false);
+      setShowProgress(false);
+      setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
     }
   };
 

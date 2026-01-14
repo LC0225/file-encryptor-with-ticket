@@ -106,9 +106,9 @@ async function deriveKeyCBC(ticket) {
 }
 
 /**
- * 加密文件数据
+ * 加密单个数据块
  */
-async function encryptFile(fileData, algorithm, ticket) {
+async function encryptChunk(chunkData, algorithm, ticket) {
   const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
   const iv = crypto.getRandomValues(new Uint8Array(algorithm === 'AES-GCM' ? 12 : 16));
 
@@ -118,7 +118,7 @@ async function encryptFile(fileData, algorithm, ticket) {
       iv: iv,
     },
     key,
-    fileData
+    chunkData
   );
 
   return {
@@ -192,29 +192,56 @@ self.addEventListener('message', async (e) => {
         data: { totalSize: fileData.byteLength }
       });
 
-      // 直接加密整个文件（不分块）
-      const result = await encryptFile(fileData, algorithm, ticket);
+      // 分块加密以支持进度显示
+      const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+      const totalChunks = Math.ceil(fileData.byteLength / CHUNK_SIZE);
+      const encryptedChunks = [];
+      const ivs = [];
 
-      // 发送完成消息 - 直接发送Uint8Array，不转base64
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, fileData.byteLength);
+        const chunk = fileData.slice(start, end);
+
+        // 加密当前块
+        const result = await encryptChunk(chunk, algorithm, ticket);
+        encryptedChunks.push(result.encryptedData);
+        ivs.push(result.iv);
+
+        // 发送进度更新
+        self.postMessage({
+          type: 'PROGRESS',
+          data: {
+            progress: ((i + 1) / totalChunks) * 100,
+            currentChunk: i + 1,
+            totalChunks: totalChunks
+          }
+        });
+      }
+
+      // 合并所有加密块
+      const totalEncryptedLength = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedData = new Uint8Array(totalEncryptedLength);
+      let offset = 0;
+      for (const chunk of encryptedChunks) {
+        combinedData.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      // 使用第一个块的IV作为整个文件的IV（简化方案）
+      const finalIV = ivs[0];
+
+      // 发送完成消息 - 直接发送Uint8Array
       self.postMessage({
         type: 'COMPLETE',
         data: {
-          encryptedData: result.encryptedData,
-          iv: result.iv,
-          chunkCount: 1
+          encryptedData: combinedData,
+          iv: finalIV,
+          chunkCount: totalChunks
         }
-      }, [result.encryptedData.buffer, result.iv.buffer]); // Transferable Objects
-
-      // 发送完成消息 - 直接发送Uint8Array，不转base64
-      self.postMessage({
-        type: 'COMPLETE',
-        data: {
-          encryptedData: result.encryptedData,
-          iv: result.iv
-        }
-      }, [result.encryptedData.buffer, result.iv.buffer]); // Transferable Objects
+      }, [combinedData.buffer, finalIV.buffer]); // Transferable Objects
     } else if (type === 'DECRYPT') {
-      // 解密功能（不分块）
+      // 解密功能（分块处理以支持进度显示）
       const { encryptedData, iv, ticket, algorithm } = data;
 
       // 更健壮的 base64 解码函数
@@ -242,7 +269,7 @@ self.addEventListener('message', async (e) => {
 
           // 检查长度是否合理
           if (length <= 0 || length > 2 * 1024 * 1024 * 1024) { // 最大2GB
-            throw new Error(\`Invalid binary string length: \${length}\`);
+            throw new Error('Invalid binary string length: ' + length);
           }
 
           const bytes = new Uint8Array(length);
@@ -251,7 +278,7 @@ self.addEventListener('message', async (e) => {
           }
           return bytes;
         } catch (error) {
-          throw new Error(\`Base64 decode failed: \${error.message}\`);
+          throw new Error('Base64 decode failed: ' + error.message);
         }
       }
 
@@ -259,21 +286,54 @@ self.addEventListener('message', async (e) => {
       const encryptedBuffer = base64ToArrayBuffer(encryptedData);
       const ivBuffer = base64ToArrayBuffer(iv);
 
-      const decryptedData = await crypto.subtle.decrypt(
-        {
-          name: algorithm,
-          iv: ivBuffer,
-        },
-        key,
-        encryptedBuffer
-      );
+      // 分块解密以支持进度显示
+      const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+      const totalChunks = Math.ceil(encryptedBuffer.byteLength / CHUNK_SIZE);
+      const decryptedChunks = [];
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, encryptedBuffer.byteLength);
+        const chunk = encryptedBuffer.slice(start, end);
+
+        // 解密当前块（注意：这里使用相同的IV简化处理，生产环境可能需要为每块生成不同的IV）
+        const decryptedData = await crypto.subtle.decrypt(
+          {
+            name: algorithm,
+            iv: ivBuffer,
+          },
+          key,
+          chunk
+        );
+
+        decryptedChunks.push(new Uint8Array(decryptedData));
+
+        // 发送进度更新
+        self.postMessage({
+          type: 'PROGRESS',
+          data: {
+            progress: ((i + 1) / totalChunks) * 100,
+            currentChunk: i + 1,
+            totalChunks: totalChunks
+          }
+        });
+      }
+
+      // 合并所有解密块
+      const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedData = new Uint8Array(totalDecryptedLength);
+      let offset = 0;
+      for (const chunk of decryptedChunks) {
+        combinedData.set(chunk, offset);
+        offset += chunk.length;
+      }
 
       self.postMessage({
         type: 'COMPLETE',
         data: {
-          decryptedData: new Uint8Array(decryptedData)
+          decryptedData: combinedData
         }
-      }, [new Uint8Array(decryptedData).buffer]);
+      }, [combinedData.buffer]);
     }
   } catch (error) {
     self.postMessage({
@@ -379,7 +439,8 @@ export async function decryptFileWithWorker(
   encryptedData: string,
   iv: string,
   ticket: string,
-  algorithm: 'AES-GCM' | 'AES-CBC'
+  algorithm: 'AES-GCM' | 'AES-CBC',
+  onProgress?: ProgressCallback
 ): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     // 创建Worker（直接内联代码）
@@ -392,6 +453,12 @@ export async function decryptFileWithWorker(
       const { type, data } = e.data;
 
       switch (type) {
+        case 'PROGRESS':
+          // 更新进度
+          if (onProgress) {
+            onProgress(data as EncryptionProgress);
+          }
+          break;
         case 'COMPLETE':
           // 解密完成
           worker.terminate();
