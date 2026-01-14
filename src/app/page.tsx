@@ -20,6 +20,8 @@ interface EncryptedFileResult {
   fileType: string;
   ticket: string;
   algorithm: 'AES-GCM' | 'AES-CBC';
+  fileSize: number;
+  createdAt?: string;
 }
 
 export default function Home() {
@@ -114,6 +116,8 @@ export default function Home() {
           fileType: result.fileType,
           ticket: ticketToUse,
           algorithm: 'AES-GCM',
+          fileSize: files[0].size,
+          createdAt: new Date().toISOString(),
         };
         setEncryptedFiles([encryptedResult]);
 
@@ -132,6 +136,8 @@ export default function Home() {
             fileType: result.fileType,
             ticket,
             algorithm: 'AES-GCM',
+            fileSize: file.size,
+            createdAt: new Date().toISOString(),
           });
           // 保存到历史记录
           addEncryptionHistory(result, ticket, file.size);
@@ -177,6 +183,8 @@ export default function Home() {
           fileType: result.fileType,
           ticket: ticketToUse,
           algorithm: 'AES-CBC',
+          fileSize: files[0].size,
+          createdAt: new Date().toISOString(),
         };
         setEncryptedFiles([encryptedResult]);
 
@@ -195,6 +203,8 @@ export default function Home() {
             fileType: result.fileType,
             ticket,
             algorithm: 'AES-CBC',
+            fileSize: file.size,
+            createdAt: new Date().toISOString(),
           });
           // 保存到历史记录
           addEncryptionHistory(result, ticket, file.size);
@@ -729,6 +739,10 @@ export default function Home() {
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.algorithm === 'AES-GCM' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}>
                             {item.algorithm}
                           </span>
+                        </div>
+                        <div className="mt-2 space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                          <p>文件大小：{(item.fileSize / 1024).toFixed(2)} KB</p>
+                          <p>加密时间：{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '-'}</p>
                         </div>
                       </div>
                       <button

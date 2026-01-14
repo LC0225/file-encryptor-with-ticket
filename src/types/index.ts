@@ -6,6 +6,7 @@ export interface EncryptionResult {
   iv: string;
   fileName: string;
   fileType: string;
+  algorithm: 'AES-GCM' | 'AES-CBC';
 }
 
 /**
