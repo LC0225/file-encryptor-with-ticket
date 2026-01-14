@@ -49,9 +49,6 @@ function uint8ArrayToBase64(array: Uint8Array): string {
 
 // Worker代码（内联）
 const workerCode = `
-/**
- * 从ticket生成AES-GCM加密密钥
- */
 async function deriveKeyGCM(ticket) {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -76,9 +73,6 @@ async function deriveKeyGCM(ticket) {
   );
 }
 
-/**
- * 从ticket生成AES-CBC加密密钥
- */
 async function deriveKeyCBC(ticket) {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -103,9 +97,6 @@ async function deriveKeyCBC(ticket) {
   );
 }
 
-/**
- * 加密单个数据块
- */
 async function encryptChunk(chunkData, algorithm, ticket) {
   const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
   const iv = crypto.getRandomValues(new Uint8Array(algorithm === 'AES-GCM' ? 12 : 16));
@@ -125,7 +116,6 @@ async function encryptChunk(chunkData, algorithm, ticket) {
   };
 }
 
-// 监听主线程消息
 self.addEventListener('message', async (e) => {
   const { type, data } = e.data;
 
@@ -133,14 +123,12 @@ self.addEventListener('message', async (e) => {
     if (type === 'ENCRYPT') {
       const { fileData, algorithm, ticket } = data;
 
-      // 发送开始消息
       self.postMessage({
         type: 'START',
         data: { totalSize: fileData.byteLength }
       });
 
-      // 分块加密以支持进度显示
-      const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+      const CHUNK_SIZE = 10 * 1024 * 1024;
       const totalChunks = Math.ceil(fileData.byteLength / CHUNK_SIZE);
       const encryptedChunks = [];
       const ivs = [];
@@ -150,12 +138,10 @@ self.addEventListener('message', async (e) => {
         const end = Math.min(start + CHUNK_SIZE, fileData.byteLength);
         const chunk = fileData.slice(start, end);
 
-        // 加密当前块
         const result = await encryptChunk(chunk, algorithm, ticket);
         encryptedChunks.push(result.encryptedData);
         ivs.push(result.iv);
 
-        // 发送进度更新
         self.postMessage({
           type: 'PROGRESS',
           data: {
@@ -166,7 +152,6 @@ self.addEventListener('message', async (e) => {
         });
       }
 
-      // 合并所有加密块
       const totalEncryptedLength = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
       const combinedData = new Uint8Array(totalEncryptedLength);
       let offset = 0;
@@ -175,10 +160,8 @@ self.addEventListener('message', async (e) => {
         offset += chunk.length;
       }
 
-      // 使用第一个块的IV作为整个文件的IV（简化方案）
       const finalIV = ivs[0];
 
-      // 发送完成消息 - 直接发送Uint8Array
       self.postMessage({
         type: 'COMPLETE',
         data: {
@@ -186,22 +169,17 @@ self.addEventListener('message', async (e) => {
           iv: finalIV,
           chunkCount: totalChunks
         }
-      }, [combinedData.buffer, finalIV.buffer]); // Transferable Objects
+      }, [combinedData.buffer, finalIV.buffer]);
     } else if (type === 'DECRYPT') {
-      // 解密功能（分块处理以支持进度显示）
       const { encryptedData, iv, ticket, algorithm } = data;
 
-      // 更健壮的 base64 解码函数
       function base64ToArrayBuffer(base64) {
-        // 检查输入
         if (typeof base64 !== 'string') {
           throw new Error('Base64 input is not a string');
         }
 
-        // 清理字符串：移除空格、换行符等
         const cleanBase64 = base64.replace(/[\s\r\n]/g, '');
 
-        // 检查 base64 格式
         if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
           throw new Error('Base64 string contains invalid characters');
         }
@@ -214,8 +192,7 @@ self.addEventListener('message', async (e) => {
           const binaryString = atob(cleanBase64);
           const length = binaryString.length;
 
-          // 检查长度是否合理
-          if (length <= 0 || length > 2 * 1024 * 1024 * 1024) { // 最大2GB
+          if (length <= 0 || length > 2 * 1024 * 1024 * 1024) {
             throw new Error('Invalid binary string length: ' + length);
           }
 
@@ -233,8 +210,7 @@ self.addEventListener('message', async (e) => {
       const encryptedBuffer = base64ToArrayBuffer(encryptedData);
       const ivBuffer = base64ToArrayBuffer(iv);
 
-      // 分块解密以支持进度显示
-      const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+      const CHUNK_SIZE = 10 * 1024 * 1024;
       const totalChunks = Math.ceil(encryptedBuffer.byteLength / CHUNK_SIZE);
       const decryptedChunks = [];
 
@@ -243,7 +219,6 @@ self.addEventListener('message', async (e) => {
         const end = Math.min(start + CHUNK_SIZE, encryptedBuffer.byteLength);
         const chunk = encryptedBuffer.slice(start, end);
 
-        // 解密当前块（注意：这里使用相同的IV简化处理，生产环境可能需要为每块生成不同的IV）
         const decryptedData = await crypto.subtle.decrypt(
           {
             name: algorithm,
@@ -255,7 +230,6 @@ self.addEventListener('message', async (e) => {
 
         decryptedChunks.push(new Uint8Array(decryptedData));
 
-        // 发送进度更新
         self.postMessage({
           type: 'PROGRESS',
           data: {
@@ -266,7 +240,6 @@ self.addEventListener('message', async (e) => {
         });
       }
 
-      // 合并所有解密块
       const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
       const combinedData = new Uint8Array(totalDecryptedLength);
       let offset = 0;

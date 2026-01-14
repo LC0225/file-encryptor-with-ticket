@@ -123,6 +123,12 @@ export default function Home() {
       return;
     }
 
+    // 如果用户输入了ticket，验证其格式
+    if (ticket && ticket.length < 8) {
+      setError('Ticket长度至少需要8位字符');
+      return;
+    }
+
     setLoading(true);
     setShowProgress(true);
     setError('');
@@ -136,6 +142,7 @@ export default function Home() {
         const ticketToUse = ticket || generateTicket();
         if (!ticket) {
           setTicket(ticketToUse);
+          showToast({ message: '已自动生成加密ticket，请妥善保存', type: 'success' });
         }
 
         // 使用Worker进行分块加密，避免阻塞主线程
@@ -274,6 +281,12 @@ export default function Home() {
       return;
     }
 
+    // 如果用户输入了ticket，验证其格式
+    if (ticket && ticket.length < 8) {
+      setError('Ticket长度至少需要8位字符');
+      return;
+    }
+
     setLoading(true);
     setShowProgress(true);
     setError('');
@@ -287,6 +300,7 @@ export default function Home() {
         const ticketToUse = ticket || generateTicket();
         if (!ticket) {
           setTicket(ticketToUse);
+          showToast({ message: '已自动生成加密ticket，请妥善保存', type: 'success' });
         }
 
         // 使用Worker进行分块加密，避免阻塞主线程
@@ -425,7 +439,7 @@ export default function Home() {
       return;
     }
 
-    if (!ticket) {
+    if (!ticket || ticket.trim().length === 0) {
       setError('请输入解密ticket');
       return;
     }
@@ -553,7 +567,7 @@ export default function Home() {
       return;
     }
 
-    if (!ticket) {
+    if (!ticket || ticket.trim().length === 0) {
       setError('请输入解密ticket');
       return;
     }
@@ -1108,12 +1122,12 @@ export default function Home() {
               </div>
             )}
 
-            {/* 加密进度条 */}
+            {/* 加密/解密进度条 */}
             {showProgress && (
               <div className="mt-6 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
-                    加密进度
+                    {mode === 'encrypt' ? '加密进度' : '解密进度'}
                   </span>
                   <span className="text-sm text-blue-700 dark:text-blue-400">
                     {Math.round(encryptionProgress.progress)}%
@@ -1135,7 +1149,7 @@ export default function Home() {
                   </p>
                 ) : (
                   <p className="text-xs text-blue-700 dark:text-blue-400">
-                    正在准备加密...
+                    {mode === 'encrypt' ? '正在准备加密...' : '正在准备解密...'}
                   </p>
                 )}
               </div>

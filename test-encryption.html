@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加密/解密功能测试</title>
+</head>
+<body>
+    <h1>加密/解密功能测试</h1>
+    <div>
+        <h2>步骤1: 测试文件上传</h2>
+        <input type="file" id="testFile">
+        <p id="fileInfo"></p>
+    </div>
+    <div>
+        <h2>步骤2: 测试加密</h2>
+        <button onclick="testEncryption()">测试加密 (AES-GCM)</button>
+        <p id="encryptResult"></p>
+        <div id="encryptProgress">进度: <span id="progressValue">0</span>%</div>
+    </div>
+    <script>
+        const workerCode = `
+async function deriveKeyGCM(ticket) {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(ticket),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('file-encryption-gcm-salt'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptChunk(chunkData, algorithm, ticket) {
+  const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : null;
+  const iv = crypto.getRandomValues(new Uint8Array(algorithm === 'AES-GCM' ? 12 : 16));
+
+  const encryptedData = await crypto.subtle.encrypt(
+    {
+      name: algorithm,
+      iv: iv,
+    },
+    key,
+    chunkData
+  );
+
+  return {
+    encryptedData: new Uint8Array(encryptedData),
+    iv: iv
+  };
+}
+
+self.addEventListener('message', async (e) => {
+  const { type, data } = e.data;
+
+  try {
+    if (type === 'ENCRYPT') {
+      const { fileData, algorithm, ticket } = data;
+
+      self.postMessage({
+        type: 'START',
+        data: { totalSize: fileData.byteLength }
+      });
+
+      const CHUNK_SIZE = 10 * 1024 * 1024;
+      const totalChunks = Math.ceil(fileData.byteLength / CHUNK_SIZE);
+      const encryptedChunks = [];
+      const ivs = [];
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, fileData.byteLength);
+        const chunk = fileData.slice(start, end);
+
+        const result = await encryptChunk(chunk, algorithm, ticket);
+        encryptedChunks.push(result.encryptedData);
+        ivs.push(result.iv);
+
+        self.postMessage({
+          type: 'PROGRESS',
+          data: {
+            progress: ((i + 1) / totalChunks) * 100,
+            currentChunk: i + 1,
+            totalChunks: totalChunks
+          }
+        });
+      }
+
+      const totalEncryptedLength = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedData = new Uint8Array(totalEncryptedLength);
+      let offset = 0;
+      for (const chunk of encryptedChunks) {
+        combinedData.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const finalIV = ivs[0];
+
+      self.postMessage({
+        type: 'COMPLETE',
+        data: {
+          encryptedData: combinedData,
+          iv: finalIV,
+          chunkCount: totalChunks
+        }
+      }, [combinedData.buffer, finalIV.buffer]);
+    }
+  } catch (error) {
+    self.postMessage({
+      type: 'ERROR',
+      data: { message: error.message }
+    });
+  }
+});
+        `;
+
+        const fileInput = document.getElementById('testFile');
+        let fileData = null;
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('fileInfo').textContent = `文件: ${file.name}, 大小: ${file.size} bytes`;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    fileData = event.target.result;
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        function testEncryption() {
+            if (!fileData) {
+                alert('请先选择文件');
+                return;
+            }
+
+            document.getElementById('encryptResult').textContent = '开始加密...';
+            document.getElementById('progressValue').textContent = '0';
+
+            const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+            const workerUrl = URL.createObjectURL(workerBlob);
+            const worker = new Worker(workerUrl);
+
+            worker.onmessage = (e) => {
+                const { type, data } = e.data;
+
+                if (type === 'START') {
+                    document.getElementById('encryptResult').textContent = '加密中...';
+                } else if (type === 'PROGRESS') {
+                    document.getElementById('progressValue').textContent = data.progress.toFixed(1);
+                } else if (type === 'COMPLETE') {
+                    document.getElementById('encryptResult').textContent = '加密成功！数据大小: ' + data.encryptedData.length + ' bytes';
+                    worker.terminate();
+                    URL.revokeObjectURL(workerUrl);
+                } else if (type === 'ERROR') {
+                    document.getElementById('encryptResult').textContent = '加密失败: ' + data.message;
+                    worker.terminate();
+                    URL.revokeObjectURL(workerUrl);
+                }
+            };
+
+            worker.onerror = (error) => {
+                document.getElementById('encryptResult').textContent = 'Worker错误: ' + error.message;
+                worker.terminate();
+                URL.revokeObjectURL(workerUrl);
+            };
+
+            worker.postMessage({
+                type: 'ENCRYPT',
+                data: {
+                    fileData: fileData,
+                    algorithm: 'AES-GCM',
+                    ticket: 'test-ticket-123456'
+                }
+            }, [fileData]);
+        }
+    </script>
+</body>
+</html>
