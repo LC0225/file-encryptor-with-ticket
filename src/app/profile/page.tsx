@@ -41,6 +41,12 @@ export default function Profile() {
   });
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncMessageType, setSyncMessageType] = useState<'success' | 'error' | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // 确保在客户端挂载后再渲染动态内容
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     // 登录检查
@@ -170,7 +176,7 @@ export default function Profile() {
               </span>
             </div>
             <div className="flex items-center gap-4">
-              {isAdmin() && (
+              {isMounted && isAdmin() && (
                 <Link
                   href="/admin"
                   className="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
