@@ -254,6 +254,61 @@ self.addEventListener('message', async (e) => {
           decryptedData: combinedData
         }
       }, [combinedData.buffer]);
+    } else if (type === 'DECRYPT_RAW') {
+      // 直接处理 Uint8Array，避免 base64 转换
+      const { encryptedData, iv, ticket, algorithm } = data;
+
+      const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
+
+      self.postMessage({
+        type: 'START',
+        data: { totalSize: encryptedData.byteLength }
+      });
+
+      const CHUNK_SIZE = 10 * 1024 * 1024;
+      const totalChunks = Math.ceil(encryptedData.byteLength / CHUNK_SIZE);
+      const decryptedChunks = [];
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, encryptedData.byteLength);
+        const chunk = encryptedData.slice(start, end);
+
+        const decryptedData = await crypto.subtle.decrypt(
+          {
+            name: algorithm,
+            iv: iv,
+          },
+          key,
+          chunk
+        );
+
+        decryptedChunks.push(new Uint8Array(decryptedData));
+
+        self.postMessage({
+          type: 'PROGRESS',
+          data: {
+            progress: ((i + 1) / totalChunks) * 100,
+            currentChunk: i + 1,
+            totalChunks: totalChunks
+          }
+        });
+      }
+
+      const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedData = new Uint8Array(totalDecryptedLength);
+      let offset = 0;
+      for (const chunk of decryptedChunks) {
+        combinedData.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      self.postMessage({
+        type: 'COMPLETE',
+        data: {
+          decryptedData: combinedData
+        }
+      }, [combinedData.buffer]);
     }
   } catch (error) {
     self.postMessage({
@@ -410,5 +465,69 @@ export async function decryptFileWithWorker(
         algorithm
       }
     });
+  });
+}
+
+/**
+ * 使用Worker解密文件（直接处理Uint8Array，避免base64转换）
+ */
+export async function decryptFileWithWorkerRaw(
+  encryptedData: Uint8Array,
+  iv: Uint8Array,
+  ticket: string,
+  algorithm: 'AES-GCM' | 'AES-CBC',
+  onProgress?: ProgressCallback
+): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    // 创建Worker（直接内联代码）
+    const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(workerBlob);
+    const worker = new Worker(workerUrl);
+
+    // 监听消息
+    worker.onmessage = (e) => {
+      const { type, data } = e.data;
+
+      switch (type) {
+        case 'START':
+          // 解密开始
+          break;
+        case 'PROGRESS':
+          // 更新进度
+          if (onProgress) {
+            onProgress(data as EncryptionProgress);
+          }
+          break;
+        case 'COMPLETE':
+          // 解密完成
+          worker.terminate();
+          URL.revokeObjectURL(workerUrl);
+          resolve(data.decryptedData as Uint8Array);
+          break;
+        case 'ERROR':
+          // 解密错误
+          worker.terminate();
+          URL.revokeObjectURL(workerUrl);
+          reject(new Error(data.message));
+          break;
+      }
+    };
+
+    worker.onerror = (error) => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      reject(new Error(`Worker错误: ${error.message}`));
+    };
+
+    // 发送解密任务（使用 Transferable Object 传递数据）
+    worker.postMessage({
+      type: 'DECRYPT_RAW',
+      data: {
+        encryptedData,
+        iv,
+        ticket,
+        algorithm
+      }
+    }, [encryptedData.buffer, iv.buffer]);
   });
 }

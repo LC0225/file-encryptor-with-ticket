@@ -12,6 +12,7 @@ import {
 import {
   encryptFileWithWorker,
   decryptFileWithWorker,
+  decryptFileWithWorkerRaw,
   convertToBase64,
   type WorkerEncryptionResult
 } from '@/utils/cryptoWorker';
@@ -480,6 +481,7 @@ export default function Home() {
 
       // 判断文件格式（JSON 或 二进制）
       const fileBuffer = await file.arrayBuffer();
+      console.log('文件buffer长度:', fileBuffer.byteLength);
       const fileView = new DataView(fileBuffer);
 
       let encryptedData: string;
@@ -543,9 +545,11 @@ export default function Home() {
         // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
         const firstUint32 = fileView.getUint32(0, false);
         const ivLength = firstUint32;
+        console.log('二进制格式检测 - 前4字节（IV长度）:', ivLength);
 
         // 合理的IV长度：GCM是12字节，CBC是16字节
         if (ivLength !== 12 && ivLength !== 16) {
+          console.error('无效的IV长度:', ivLength, '文件大小:', fileBuffer.byteLength);
           setError(`文件格式识别失败：既不是 JSON 格式也不是二进制格式。请确保选择了正确的 .encrypted 文件。`);
           setLoading(false);
           setShowProgress(false);
@@ -553,6 +557,7 @@ export default function Home() {
         }
 
         let offset = 0;
+        console.log('开始解析二进制格式...');
 
         // 读取IV
         offset += 4;
@@ -582,10 +587,44 @@ export default function Home() {
 
         // 读取加密数据
         const encryptedBytes = new Uint8Array(fileBuffer, offset);
+        console.log('加密数据长度:', encryptedBytes.length, '字节');
+        console.log('IV数据长度:', ivBytes.length, '字节');
+        console.log('算法:', algorithm, '文件名:', fileName, '文件类型:', fileType);
 
-        // 转换为base64
-        encryptedData = uint8ArrayToBase64(encryptedBytes);
-        iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
+        // 对于大文件，直接使用 Uint8Array，避免 base64 转换
+        console.log('使用 Uint8Array 直接解密（避免 base64 转换）...');
+
+        // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
+        if (algorithm === 'AES-GCM') {
+          setError('此文件使用AES-GCM加密，请使用AES-GCM解密按钮');
+          setLoading(false);
+          setShowProgress(false);
+          return;
+        }
+
+        // 直接使用 Uint8Array 解密
+        const decryptedData = await decryptFileWithWorkerRaw(
+          encryptedBytes,
+          ivBytes,
+          ticket,
+          'AES-CBC',
+          (progress) => {
+            setEncryptionProgress(progress);
+            setProcessedBytes((progress.progress / 100) * encryptedBytes.length);
+          }
+        );
+
+        setDecryptedFile({
+          data: new Blob([decryptedData.buffer as ArrayBuffer], { type: fileType }),
+          fileName: fileName,
+          fileType: fileType,
+        });
+
+        setSuccess('AES-CBC文件解密成功！');
+        setLoading(false);
+        setShowProgress(false);
+        setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
+        return;
       }
 
       // 如果文件是用AES-CBC加密的，提示用户使用AES-CBC解密
@@ -675,6 +714,7 @@ export default function Home() {
 
       // 判断文件格式（JSON 或 二进制）
       const fileBuffer = await file.arrayBuffer();
+      console.log('文件buffer长度:', fileBuffer.byteLength);
       const fileView = new DataView(fileBuffer);
 
       let encryptedData: string;
@@ -726,9 +766,11 @@ export default function Home() {
         // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
         const firstUint32 = fileView.getUint32(0, false);
         const ivLength = firstUint32;
+        console.log('二进制格式检测 - 前4字节（IV长度）:', ivLength);
 
         // 合理的IV长度：GCM是12字节，CBC是16字节
         if (ivLength !== 12 && ivLength !== 16) {
+          console.error('无效的IV长度:', ivLength, '文件大小:', fileBuffer.byteLength);
           setError(`文件格式识别失败：既不是 JSON 格式也不是二进制格式。请确保选择了正确的 .encrypted 文件。`);
           setLoading(false);
           setShowProgress(false);
@@ -736,6 +778,7 @@ export default function Home() {
         }
 
         let offset = 0;
+        console.log('开始解析二进制格式...');
 
         // 读取IV
         offset += 4;
@@ -765,10 +808,44 @@ export default function Home() {
 
         // 读取加密数据
         const encryptedBytes = new Uint8Array(fileBuffer, offset);
+        console.log('加密数据长度:', encryptedBytes.length, '字节');
+        console.log('IV数据长度:', ivBytes.length, '字节');
+        console.log('算法:', algorithm, '文件名:', fileName, '文件类型:', fileType);
 
-        // 转换为base64
-        encryptedData = uint8ArrayToBase64(encryptedBytes);
-        iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
+        // 对于大文件，直接使用 Uint8Array，避免 base64 转换
+        console.log('使用 Uint8Array 直接解密（避免 base64 转换）...');
+
+        // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
+        if (algorithm === 'AES-GCM') {
+          setError('此文件使用AES-GCM加密，请使用AES-GCM解密按钮');
+          setLoading(false);
+          setShowProgress(false);
+          return;
+        }
+
+        // 直接使用 Uint8Array 解密
+        const decryptedData = await decryptFileWithWorkerRaw(
+          encryptedBytes,
+          ivBytes,
+          ticket,
+          'AES-CBC',
+          (progress) => {
+            setEncryptionProgress(progress);
+            setProcessedBytes((progress.progress / 100) * encryptedBytes.length);
+          }
+        );
+
+        setDecryptedFile({
+          data: new Blob([decryptedData.buffer as ArrayBuffer], { type: fileType }),
+          fileName: fileName,
+          fileType: fileType,
+        });
+
+        setSuccess('AES-CBC文件解密成功！');
+        setLoading(false);
+        setShowProgress(false);
+        setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
+        return;
       }
 
       // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
