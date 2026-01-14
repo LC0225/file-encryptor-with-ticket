@@ -60,6 +60,17 @@ export default function Home() {
   });
   const [showProgress, setShowProgress] = useState(false);
 
+  // Helper函数：将Uint8Array转换为base64（分块处理，避免堆栈溢出）
+  const uint8ArrayToBase64 = (array: Uint8Array): string => {
+    let binary = '';
+    const chunkSize = 8192; // 8KB chunks
+    for (let i = 0; i < array.byteLength; i += chunkSize) {
+      const chunk = array.subarray(i, Math.min(i + chunkSize, array.byteLength));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+  };
+
   // 确保在客户端挂载后再渲染动态内容
   useEffect(() => {
     setIsMounted(true);
@@ -475,7 +486,7 @@ export default function Home() {
         const encryptedBytes = new Uint8Array(fileBuffer, offset);
 
         // 转换为base64
-        encryptedData = btoa(String.fromCharCode.apply(null, Array.from(encryptedBytes)));
+        encryptedData = uint8ArrayToBase64(encryptedBytes);
         iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
       } else {
         // JSON格式
@@ -594,7 +605,7 @@ export default function Home() {
         const encryptedBytes = new Uint8Array(fileBuffer, offset);
 
         // 转换为base64
-        encryptedData = btoa(String.fromCharCode.apply(null, Array.from(encryptedBytes)));
+        encryptedData = uint8ArrayToBase64(encryptedBytes);
         iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
       } else {
         // JSON格式

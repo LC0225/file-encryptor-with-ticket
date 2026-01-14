@@ -225,7 +225,7 @@ self.addEventListener('message', async (e) => {
         }
 
         // 清理字符串：移除空格、换行符等
-        const cleanBase64 = base64.replace(/[\\s\\r\\n]/g, '');
+        const cleanBase64 = base64.replace(/[\s\r\n]/g, '');
 
         // 检查 base64 格式
         if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
@@ -236,17 +236,28 @@ self.addEventListener('message', async (e) => {
           throw new Error('Base64 string is empty');
         }
 
-        const binaryString = atob(cleanBase64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+        try {
+          const binaryString = atob(cleanBase64);
+          const length = binaryString.length;
+
+          // 检查长度是否合理
+          if (length <= 0 || length > 2 * 1024 * 1024 * 1024) { // 最大2GB
+            throw new Error(\`Invalid binary string length: \${length}\`);
+          }
+
+          const bytes = new Uint8Array(length);
+          for (let i = 0; i < length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          return bytes;
+        } catch (error) {
+          throw new Error(\`Base64 decode failed: \${error.message}\`);
         }
-        return bytes;
       }
 
       const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
-      const encryptedBuffer = base64ToArrayBuffer(encryptedData, 'encryptedData');
-      const ivBuffer = base64ToArrayBuffer(iv, 'iv');
+      const encryptedBuffer = base64ToArrayBuffer(encryptedData);
+      const ivBuffer = base64ToArrayBuffer(iv);
 
       const decryptedData = await crypto.subtle.decrypt(
         {
