@@ -360,10 +360,14 @@ self.addEventListener('message', async (e) => {
               const end = Math.min(start + CHUNK_SIZE, originalFileSize);
               const plainChunkSize = end - start;
 
-              // 计算当前密文块的大小（向上取整到16字节的倍数）
-              const cipherChunkSize = Math.ceil(plainChunkSize / 16) * 16;
+              // 计算当前密文块的大小
+              // AES-CBC使用PKCS#7 padding，规则：
+              // - 如果明文块是16的倍数，添加一个完整的16字节padding块
+              // - 否则，填充到下一个16字节的倍数
+              const paddingSize = plainChunkSize % 16 === 0 ? 16 : (16 - (plainChunkSize % 16));
+              const cipherChunkSize = plainChunkSize + paddingSize;
 
-              console.log(\`[Worker] 解密块 \${i + 1}/\${totalChunks} - 明文大小: \${plainChunkSize}, 密文大小: \${cipherChunkSize}\`);
+              console.log(\`[Worker] 解密块 \${i + 1}/\${totalChunks} - 明文大小: \${plainChunkSize}, padding大小: \${paddingSize}, 密文大小: \${cipherChunkSize}\`);
 
               // 提取当前密文块
               const cipherChunk = encryptedData.slice(encryptedOffset, encryptedOffset + cipherChunkSize);
