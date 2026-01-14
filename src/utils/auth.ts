@@ -134,10 +134,22 @@ export function logoutUser(): void {
 export async function getCurrentUser(): Promise<User | null> {
   if (typeof window === 'undefined') return null;
 
+  // 先尝试从 localStorage 获取（优先使用本地缓存）
+  const localUser = authLocalStorage.getCurrentUser();
+  if (localUser) {
+    console.log('✅ 从 localStorage 获取到当前用户:', localUser.username);
+    return localUser;
+  }
+
+  console.log('⚠️ localStorage 中没有用户信息，尝试从数据库获取');
+
   if (canUseDatabase()) {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) return null;
+      if (!token) {
+        console.log('⚠️ 没有找到 token');
+        return null;
+      }
 
       const response = await fetch('/api/auth/user', {
         headers: {
@@ -157,6 +169,7 @@ export async function getCurrentUser(): Promise<User | null> {
 
       const data = await response.json();
       if (data.success) {
+        console.log('✅ 从数据库获取到当前用户:', data.user.username);
         return data.user;
       }
 
