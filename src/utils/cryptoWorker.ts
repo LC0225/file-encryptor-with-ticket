@@ -128,48 +128,72 @@ self.addEventListener('message', async (e) => {
         data: { totalSize: fileData.byteLength }
       });
 
-      const CHUNK_SIZE = 10 * 1024 * 1024;
-      const totalChunks = Math.ceil(fileData.byteLength / CHUNK_SIZE);
-      const encryptedChunks = [];
-      const ivs = [];
+      let encryptedData;
+      let iv;
 
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, fileData.byteLength);
-        const chunk = fileData.slice(start, end);
-
-        const result = await encryptChunk(chunk, algorithm, ticket);
-        encryptedChunks.push(result.encryptedData);
-        ivs.push(result.iv);
+      if (algorithm === 'AES-GCM') {
+        // AES-GCM：直接加密整个文件，不分块
+        // 因为AES-GCM每个块需要不同的IV，分块解密会很复杂
+        // 对于小于64GB的文件，直接加密是安全的
+        const key = await deriveKeyGCM(ticket);
+        iv = crypto.getRandomValues(new Uint8Array(12)); // GCM使用12字节IV
+        encryptedData = await crypto.subtle.encrypt(
+          { name: 'AES-GCM', iv: iv },
+          key,
+          fileData
+        );
+        encryptedData = new Uint8Array(encryptedData);
 
         self.postMessage({
           type: 'PROGRESS',
-          data: {
-            progress: ((i + 1) / totalChunks) * 100,
-            currentChunk: i + 1,
-            totalChunks: totalChunks
-          }
+          data: { progress: 100, currentChunk: 1, totalChunks: 1 }
         });
-      }
+      } else {
+        // AES-CBC：分块加密
+        const CHUNK_SIZE = 10 * 1024 * 1024;
+        const totalChunks = Math.ceil(fileData.byteLength / CHUNK_SIZE);
+        const encryptedChunks = [];
+        const ivs = [];
 
-      const totalEncryptedLength = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const combinedData = new Uint8Array(totalEncryptedLength);
-      let offset = 0;
-      for (const chunk of encryptedChunks) {
-        combinedData.set(chunk, offset);
-        offset += chunk.length;
-      }
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, fileData.byteLength);
+          const chunk = fileData.slice(start, end);
 
-      const finalIV = ivs[0];
+          const result = await encryptChunk(chunk, algorithm, ticket);
+          encryptedChunks.push(result.encryptedData);
+          ivs.push(result.iv);
+
+          self.postMessage({
+            type: 'PROGRESS',
+            data: {
+              progress: ((i + 1) / totalChunks) * 100,
+              currentChunk: i + 1,
+              totalChunks: totalChunks
+            }
+          });
+        }
+
+        const totalEncryptedLength = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const combinedData = new Uint8Array(totalEncryptedLength);
+        let offset = 0;
+        for (const chunk of encryptedChunks) {
+          combinedData.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        encryptedData = combinedData;
+        iv = ivs[0];
+      }
 
       self.postMessage({
         type: 'COMPLETE',
         data: {
-          encryptedData: combinedData,
-          iv: finalIV,
-          chunkCount: totalChunks
+          encryptedData: encryptedData,
+          iv: iv,
+          chunkCount: 1
         }
-      }, [combinedData.buffer, finalIV.buffer]);
+      }, [encryptedData.buffer, iv.buffer]);
     } else if (type === 'DECRYPT') {
       const { encryptedData, iv, ticket, algorithm } = data;
 
@@ -210,50 +234,72 @@ self.addEventListener('message', async (e) => {
       const encryptedBuffer = base64ToArrayBuffer(encryptedData);
       const ivBuffer = base64ToArrayBuffer(iv);
 
-      const CHUNK_SIZE = 10 * 1024 * 1024;
-      const totalChunks = Math.ceil(encryptedBuffer.byteLength / CHUNK_SIZE);
-      const decryptedChunks = [];
+      let decryptedData;
 
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, encryptedBuffer.byteLength);
-        const chunk = encryptedBuffer.slice(start, end);
-
-        const decryptedData = await crypto.subtle.decrypt(
+      if (algorithm === 'AES-GCM') {
+        // AES-GCM：直接解密整个文件
+        decryptedData = await crypto.subtle.decrypt(
           {
-            name: algorithm,
+            name: 'AES-GCM',
             iv: ivBuffer,
           },
           key,
-          chunk
+          encryptedBuffer
         );
-
-        decryptedChunks.push(new Uint8Array(decryptedData));
 
         self.postMessage({
           type: 'PROGRESS',
-          data: {
-            progress: ((i + 1) / totalChunks) * 100,
-            currentChunk: i + 1,
-            totalChunks: totalChunks
-          }
+          data: { progress: 100, currentChunk: 1, totalChunks: 1 }
         });
-      }
+      } else {
+        // AES-CBC：分块解密
+        const CHUNK_SIZE = 10 * 1024 * 1024;
+        const totalChunks = Math.ceil(encryptedBuffer.byteLength / CHUNK_SIZE);
+        const decryptedChunks = [];
 
-      const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const combinedData = new Uint8Array(totalDecryptedLength);
-      let offset = 0;
-      for (const chunk of decryptedChunks) {
-        combinedData.set(chunk, offset);
-        offset += chunk.length;
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, encryptedBuffer.byteLength);
+          const chunk = encryptedBuffer.slice(start, end);
+
+          const decryptedChunk = await crypto.subtle.decrypt(
+            {
+              name: algorithm,
+              iv: ivBuffer,
+            },
+            key,
+            chunk
+          );
+
+          decryptedChunks.push(new Uint8Array(decryptedChunk));
+
+          self.postMessage({
+            type: 'PROGRESS',
+            data: {
+              progress: ((i + 1) / totalChunks) * 100,
+              currentChunk: i + 1,
+              totalChunks: totalChunks
+            }
+          });
+        }
+
+        const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const combinedData = new Uint8Array(totalDecryptedLength);
+        let offset = 0;
+        for (const chunk of decryptedChunks) {
+          combinedData.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        decryptedData = combinedData;
       }
 
       self.postMessage({
         type: 'COMPLETE',
         data: {
-          decryptedData: combinedData
+          decryptedData: new Uint8Array(decryptedData)
         }
-      }, [combinedData.buffer]);
+      }, [new Uint8Array(decryptedData).buffer]);
     } else if (type === 'DECRYPT_RAW') {
       // 直接处理 Uint8Array，避免 base64 转换
       const { encryptedData, iv, ticket, algorithm } = data;
@@ -265,50 +311,72 @@ self.addEventListener('message', async (e) => {
         data: { totalSize: encryptedData.byteLength }
       });
 
-      const CHUNK_SIZE = 10 * 1024 * 1024;
-      const totalChunks = Math.ceil(encryptedData.byteLength / CHUNK_SIZE);
-      const decryptedChunks = [];
+      let decryptedData;
 
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, encryptedData.byteLength);
-        const chunk = encryptedData.slice(start, end);
-
-        const decryptedData = await crypto.subtle.decrypt(
+      if (algorithm === 'AES-GCM') {
+        // AES-GCM：直接解密整个文件，不分块
+        decryptedData = await crypto.subtle.decrypt(
           {
-            name: algorithm,
+            name: 'AES-GCM',
             iv: iv,
           },
           key,
-          chunk
+          encryptedData
         );
-
-        decryptedChunks.push(new Uint8Array(decryptedData));
 
         self.postMessage({
           type: 'PROGRESS',
-          data: {
-            progress: ((i + 1) / totalChunks) * 100,
-            currentChunk: i + 1,
-            totalChunks: totalChunks
-          }
+          data: { progress: 100, currentChunk: 1, totalChunks: 1 }
         });
-      }
+      } else {
+        // AES-CBC：分块解密
+        const CHUNK_SIZE = 10 * 1024 * 1024;
+        const totalChunks = Math.ceil(encryptedData.byteLength / CHUNK_SIZE);
+        const decryptedChunks = [];
 
-      const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const combinedData = new Uint8Array(totalDecryptedLength);
-      let offset = 0;
-      for (const chunk of decryptedChunks) {
-        combinedData.set(chunk, offset);
-        offset += chunk.length;
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, encryptedData.byteLength);
+          const chunk = encryptedData.slice(start, end);
+
+          const decryptedChunk = await crypto.subtle.decrypt(
+            {
+              name: algorithm,
+              iv: iv,
+            },
+            key,
+            chunk
+          );
+
+          decryptedChunks.push(new Uint8Array(decryptedChunk));
+
+          self.postMessage({
+            type: 'PROGRESS',
+            data: {
+              progress: ((i + 1) / totalChunks) * 100,
+              currentChunk: i + 1,
+              totalChunks: totalChunks
+            }
+          });
+        }
+
+        const totalDecryptedLength = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const combinedData = new Uint8Array(totalDecryptedLength);
+        let offset = 0;
+        for (const chunk of decryptedChunks) {
+          combinedData.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        decryptedData = combinedData;
       }
 
       self.postMessage({
         type: 'COMPLETE',
         data: {
-          decryptedData: combinedData
+          decryptedData: new Uint8Array(decryptedData)
         }
-      }, [combinedData.buffer]);
+      }, [new Uint8Array(decryptedData).buffer]);
     }
   } catch (error) {
     self.postMessage({
