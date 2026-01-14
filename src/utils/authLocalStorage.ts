@@ -86,7 +86,25 @@ function saveUsers(users: UserType[]): void {
  */
 export async function initAdminUser(): Promise<void> {
   const users = getUsers();
-  if (users.length === 0) {
+
+  // 查找是否已存在 root 用户
+  const existingAdmin = users.find(u => u.username === 'root');
+
+  if (existingAdmin) {
+    // 确保 root 用户有正确的 role 字段
+    let needsUpdate = false;
+
+    if (!existingAdmin.role) {
+      existingAdmin.role = 'admin';
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      saveUsers(users);
+      console.log('✅ 已更新管理员账号的 role 字段');
+    }
+  } else {
+    // 创建新的管理员账号
     const admin: UserType = {
       id: 'admin_' + Date.now(),
       username: 'root',
@@ -96,6 +114,7 @@ export async function initAdminUser(): Promise<void> {
     };
     users.push(admin);
     saveUsers(users);
+    console.log('✅ 已创建管理员账号');
   }
 }
 
@@ -230,6 +249,12 @@ export function isAdmin(): boolean {
     const session = JSON.parse(sessionData);
     const users = getUsers();
     const user = users.find((u) => u.id === session.userId);
+
+    // 如果是 root 用户，默认为管理员
+    if (user?.username === 'root') {
+      return true;
+    }
+
     return user?.role === 'admin';
   } catch (error) {
     return false;

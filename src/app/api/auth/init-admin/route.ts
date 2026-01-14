@@ -28,9 +28,18 @@ export async function POST(request: NextRequest) {
 
     // 检查是否已有管理员
     const users = await userManager.getUsers();
-    const existingAdmin = users.find(u => u.role === 'admin');
+    const existingAdmin = users.find(u => u.username === 'root');
 
     if (existingAdmin) {
+      // 确保 root 用户有正确的 role 字段
+      if (existingAdmin.role !== 'admin') {
+        await userManager.updateUser(existingAdmin.id, { role: 'admin' });
+        return NextResponse.json({
+          success: true,
+          message: '管理员账号 role 字段已更新',
+        });
+      }
+
       return NextResponse.json({
         success: true,
         message: '管理员账号已存在',
