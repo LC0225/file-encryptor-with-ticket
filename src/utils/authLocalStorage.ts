@@ -102,6 +102,20 @@ export async function initAdminUser(): Promise<void> {
     if (needsUpdate) {
       saveUsers(users);
       console.log('✅ 已更新管理员账号的 role 字段');
+
+      // 如果当前登录的是 root 用户，清除 session 强制重新登录
+      const sessionData = localStorage.getItem(SESSION_KEY);
+      if (sessionData) {
+        try {
+          const session = JSON.parse(sessionData);
+          if (session.username === 'root') {
+            localStorage.removeItem(SESSION_KEY);
+            console.log('✅ 已清除旧 session，请重新登录');
+          }
+        } catch (error) {
+          // 解析失败，忽略
+        }
+      }
     }
   } else {
     // 创建新的管理员账号
@@ -228,6 +242,12 @@ export function getCurrentUser(): any | null {
 
     // 返回用户对象（排除密码哈希）
     const { passwordHash, ...userWithoutPassword } = user;
+
+    // 如果是 root 用户但没有 role 字段，默认设置为 admin
+    if (userWithoutPassword.username === 'root' && !userWithoutPassword.role) {
+      userWithoutPassword.role = 'admin';
+    }
+
     return userWithoutPassword;
   } catch (error) {
     console.error('获取当前用户失败:', error);
