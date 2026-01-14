@@ -522,12 +522,6 @@ export default function Profile() {
                           <div className="mt-2 space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                             <p>文件大小：{formatFileSize(item.fileSize)}</p>
                             <p>加密时间：{formatDate(item.createdAt)}</p>
-                            <p>
-                              加密方式：
-                              <span className={`ml-1 inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${item.algorithm === 'AES-GCM' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}>
-                                {item.algorithm}
-                              </span>
-                            </p>
                           </div>
                         </div>
                         <button

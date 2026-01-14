@@ -10,11 +10,14 @@ export interface EncryptionResult {
 }
 
 /**
- * 加密历史记录
+ * 加密历史记录（只存储元数据，不存储加密数据）
  */
-export interface EncryptionHistory extends EncryptionResult {
+export interface EncryptionHistory {
   id: string;
+  fileName: string;
+  fileType: string;
   ticket: string;
+  algorithm: 'AES-GCM' | 'AES-CBC';
   createdAt: string;
   fileSize: number;
 }

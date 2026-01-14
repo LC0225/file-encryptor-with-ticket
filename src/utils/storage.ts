@@ -20,7 +20,7 @@ export function getEncryptionHistory(): EncryptionHistory[] {
 }
 
 /**
- * 添加加密记录
+ * 添加加密记录（只存储元数据）
  */
 export function addEncryptionHistory(
   record: EncryptionResult,
@@ -32,11 +32,13 @@ export function addEncryptionHistory(
   try {
     const history = getEncryptionHistory();
     const newRecord: EncryptionHistory = {
-      ...record,
-      id: Date.now().toString(),
+      fileName: record.fileName,
+      fileType: record.fileType,
       ticket,
+      algorithm: record.algorithm,
       createdAt: new Date().toISOString(),
       fileSize,
+      id: Date.now().toString(),
     };
     history.unshift(newRecord);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
@@ -44,7 +46,34 @@ export function addEncryptionHistory(
     // 触发云同步
     syncToCloud().catch(error => console.error('添加加密历史后云同步失败:', error));
   } catch (error) {
-    console.error('保存加密历史失败:', error);
+    if (error instanceof Error && error.name === 'QuotaExceededError') {
+      // localStorage 配额超出，尝试删除最旧的记录
+      console.warn('localStorage 配额超出，尝试清理旧记录');
+      try {
+        const history = getEncryptionHistory();
+        if (history.length > 0) {
+          // 删除最旧的记录（列表末尾）
+          history.pop();
+          const newRecord: EncryptionHistory = {
+            fileName: record.fileName,
+            fileType: record.fileType,
+            ticket,
+            algorithm: record.algorithm,
+            createdAt: new Date().toISOString(),
+            fileSize,
+            id: Date.now().toString(),
+          };
+          history.unshift(newRecord);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+          // 触发云同步
+          syncToCloud().catch(err => console.error('添加加密历史后云同步失败:', err));
+        }
+      } catch (retryError) {
+        console.error('清理旧记录后仍然无法保存:', retryError);
+      }
+    } else {
+      console.error('保存加密历史失败:', error);
+    }
   }
 }
 

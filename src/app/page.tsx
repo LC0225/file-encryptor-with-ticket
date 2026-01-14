@@ -606,9 +606,14 @@ export default function Home() {
                   )}
                 </div>
                 {ticket && (
-                  <p className="mt-2 text-sm text-orange-600 dark:text-orange-400">
-                    ⚠️ 请保存好此ticket，文件解密时需要使用
-                  </p>
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                      ⚠️ 请保存好此ticket，文件解密时需要使用
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      💡 提示：加密完成后请立即下载加密文件，历史记录只存储元数据
+                    </p>
+                  </div>
                 )}
               </div>
             )}
