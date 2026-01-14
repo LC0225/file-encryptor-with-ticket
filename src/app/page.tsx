@@ -18,6 +18,7 @@ import {
 import { addEncryptionHistory } from '@/utils/storage';
 import { getCurrentUser, logoutUser, isLoggedIn, isAdmin } from '@/utils/auth';
 import { useToast } from '@/components/ToastContext';
+import { PerformanceMonitor } from '@/components/PerformanceMonitor';
 
 interface EncryptedFileResult {
   encryptedData: Uint8Array;
@@ -59,6 +60,8 @@ export default function Home() {
     totalChunks: 0
   });
   const [showProgress, setShowProgress] = useState(false);
+  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
+  const [processedBytes, setProcessedBytes] = useState(0);
 
   // Helper函数：将Uint8Array转换为base64（分块处理，避免堆栈溢出）
   const uint8ArrayToBase64 = (array: Uint8Array): string => {
@@ -131,6 +134,8 @@ export default function Home() {
 
     setLoading(true);
     setShowProgress(true);
+    setProcessingStartTime(Date.now());
+    setProcessedBytes(0);
     setError('');
     setSuccess('');
     setEncryptedFiles([]);
@@ -152,6 +157,7 @@ export default function Home() {
           'AES-GCM',
           (progress) => {
             setEncryptionProgress(progress);
+            setProcessedBytes((progress.progress / 100) * files[0].size);
           }
         );
 
@@ -272,6 +278,8 @@ export default function Home() {
       setLoading(false);
       setShowProgress(false);
       setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
+      setProcessingStartTime(null);
+      setProcessedBytes(0);
     }
   };
 
@@ -289,6 +297,8 @@ export default function Home() {
 
     setLoading(true);
     setShowProgress(true);
+    setProcessingStartTime(Date.now());
+    setProcessedBytes(0);
     setError('');
     setSuccess('');
     setEncryptedFiles([]);
@@ -310,6 +320,7 @@ export default function Home() {
           'AES-CBC',
           (progress) => {
             setEncryptionProgress(progress);
+            setProcessedBytes((progress.progress / 100) * files[0].size);
           }
         );
 
@@ -430,6 +441,8 @@ export default function Home() {
       setLoading(false);
       setShowProgress(false);
       setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
+      setProcessingStartTime(null);
+      setProcessedBytes(0);
     }
   };
 
@@ -446,6 +459,8 @@ export default function Home() {
 
     setLoading(true);
     setShowProgress(true);
+    setProcessingStartTime(Date.now());
+    setProcessedBytes(0);
     setError('');
     setSuccess('');
     setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
@@ -542,6 +557,9 @@ export default function Home() {
         'AES-GCM',
         (progress) => {
           setEncryptionProgress(progress);
+          // 估算已处理的加密数据量（加密数据大小 ≈ 原始数据大小 + AES-GCM tag 16字节）
+          const estimatedProcessedSize = (progress.progress / 100) * (encryptedData.length / 4 * 3);
+          setProcessedBytes(estimatedProcessedSize);
         }
       );
 
@@ -574,6 +592,8 @@ export default function Home() {
 
     setLoading(true);
     setShowProgress(true);
+    setProcessingStartTime(Date.now());
+    setProcessedBytes(0);
     setError('');
     setSuccess('');
     setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
@@ -670,6 +690,9 @@ export default function Home() {
         'AES-CBC',
         (progress) => {
           setEncryptionProgress(progress);
+          // 估算已处理的加密数据量
+          const estimatedProcessedSize = (progress.progress / 100) * (encryptedData.length / 4 * 3);
+          setProcessedBytes(estimatedProcessedSize);
         }
       );
 
@@ -1353,6 +1376,15 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* 性能监控 */}
+      <PerformanceMonitor
+        isActive={loading && showProgress}
+        currentProgress={encryptionProgress.progress}
+        processedBytes={processedBytes}
+        totalBytes={files.length > 0 ? files[0].size : undefined}
+        startTime={processingStartTime}
+      />
     </div>
   );
 }
