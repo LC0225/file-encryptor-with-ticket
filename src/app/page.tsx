@@ -112,13 +112,57 @@ export default function Home() {
     }
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     setFiles(selectedFiles);
     setEncryptedFiles([]);
     setDecryptedFile(null);
     setError('');
     setSuccess('');
+
+    // 如果是解密模式且选择了文件，尝试检测加密算法
+    if (mode === 'decrypt' && selectedFiles.length === 1) {
+      const file = selectedFiles[0];
+      if (file.name.endsWith('.encrypted')) {
+        try {
+          const fileBuffer = await file.arrayBuffer();
+          const fileView = new DataView(fileBuffer);
+          const firstByte = fileView.getUint8(0);
+
+          // 优先检查JSON格式
+          if (firstByte === 0x7B) {
+            const fileContent = await file.text();
+            try {
+              const jsonData = JSON.parse(fileContent);
+              const algorithm = jsonData.algorithm || 'AES-GCM';
+              setSuccess(`检测到加密算法: ${algorithm}，请使用对应的解密按钮`);
+            } catch {
+              // JSON解析失败，不显示算法
+            }
+          } else {
+            // 二进制格式
+            const firstUint32 = fileView.getUint32(0, false);
+            const ivLength = firstUint32;
+
+            if (ivLength === 12 || ivLength === 16) {
+              let offset = 4 + ivLength; // IV长度字段 + IV数据
+              const algorithmLength = fileView.getUint32(offset, false);
+              offset += 4;
+              const algorithmBytes = new Uint8Array(fileBuffer, offset, algorithmLength);
+              const algorithm = new TextDecoder().decode(algorithmBytes);
+              setSuccess(`检测到加密算法: ${algorithm}，请使用对应的解密按钮`);
+            }
+          }
+
+          // 5秒后清除提示
+          setTimeout(() => {
+            setSuccess('');
+          }, 5000);
+        } catch (error) {
+          // 检测失败，不影响文件选择
+        }
+      }
+    }
   };
 
   const handleEncryptGCM = async () => {
@@ -596,7 +640,7 @@ export default function Home() {
 
         // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
         if (algorithm === 'AES-GCM') {
-          setError('此文件使用AES-GCM加密，请使用AES-GCM解密按钮');
+          setError('此文件使用AES-GCM加密，请点击左侧的"解密（AES-GCM）"按钮');
           setLoading(false);
           setShowProgress(false);
           return;
@@ -629,7 +673,7 @@ export default function Home() {
 
       // 如果文件是用AES-CBC加密的，提示用户使用AES-CBC解密
       if (algorithm === 'AES-CBC') {
-        setError('此文件使用AES-CBC加密，请使用AES-CBC解密按钮');
+        setError('此文件使用AES-CBC加密，请点击右侧的"解密（AES-CBC）"按钮');
         setLoading(false);
         setShowProgress(false);
         return;
@@ -817,7 +861,7 @@ export default function Home() {
 
         // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
         if (algorithm === 'AES-GCM') {
-          setError('此文件使用AES-GCM加密，请使用AES-GCM解密按钮');
+          setError('此文件使用AES-GCM加密，请点击左侧的"解密（AES-GCM）"按钮');
           setLoading(false);
           setShowProgress(false);
           return;
