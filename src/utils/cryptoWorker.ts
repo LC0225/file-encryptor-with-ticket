@@ -178,9 +178,9 @@ self.addEventListener('message', async (e) => {
           throw new Error('Base64 input is not a string');
         }
 
-        const cleanBase64 = base64.replace(/[\s\r\n]/g, '');
+        const cleanBase64 = base64.replace(new RegExp('[\\s\\r\\n]', 'g'), '');
 
-        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
+        if (!new RegExp('^[A-Za-z0-9+/]*={0,2}$').test(cleanBase64)) {
           throw new Error('Base64 string contains invalid characters');
         }
 
