@@ -8,7 +8,7 @@ import {
   deleteEncryptionHistory,
   clearEncryptionHistory,
 } from '@/utils/storage';
-import { getCurrentUser, logoutUser, isLoggedIn } from '@/utils/auth';
+import { getCurrentUser, logoutUser, isLoggedIn, isAdmin } from '@/utils/auth';
 import {
   getSyncStatus,
   fullSync,
@@ -170,7 +170,7 @@ export default function Profile() {
               </span>
             </div>
             <div className="flex items-center gap-4">
-              {currentUser?.role === 'admin' && (
+              {isAdmin() && (
                 <Link
                   href="/admin"
                   className="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"

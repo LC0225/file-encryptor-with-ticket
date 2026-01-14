@@ -10,7 +10,7 @@ import {
   generateTicket,
 } from '@/utils/crypto';
 import { addEncryptionHistory } from '@/utils/storage';
-import { getCurrentUser, logoutUser, isLoggedIn } from '@/utils/auth';
+import { getCurrentUser, logoutUser, isLoggedIn, isAdmin } from '@/utils/auth';
 import { useToast } from '@/components/ToastContext';
 
 interface EncryptedFileResult {
@@ -274,7 +274,7 @@ export default function Home() {
               文件加密工具
             </h1>
             <div className="flex items-center gap-4">
-              {currentUser?.role === 'admin' && (
+              {isAdmin() && (
                 <Link
                   href="/admin"
                   className="rounded-lg px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
