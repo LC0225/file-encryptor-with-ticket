@@ -134,6 +134,17 @@ export function logoutUser(): void {
 export async function getCurrentUser(): Promise<User | null> {
   if (typeof window === 'undefined') return null;
 
+  // 调试：打印 localStorage 的所有相关内容
+  const allKeys = Object.keys(localStorage);
+  const relevantKeys = allKeys.filter(key =>
+    key.includes('crypto') || key.includes('auth') || key.includes('session') || key.includes('user')
+  );
+  console.log('🔍 localStorage 相关键:', relevantKeys);
+  relevantKeys.forEach(key => {
+    const value = localStorage.getItem(key);
+    console.log(`  ${key}:`, value ? `${value.substring(0, 50)}...` : '(空)');
+  });
+
   // 先尝试从 localStorage 获取（优先使用本地缓存）
   const localUser = authLocalStorage.getCurrentUser();
   if (localUser) {

@@ -227,19 +227,29 @@ export function logoutUser(): void {
 export function getCurrentUser(): any | null {
   if (typeof window === 'undefined') return null;
   try {
+    console.log('🔍 [authLocalStorage] 开始获取当前用户');
     const sessionData = localStorage.getItem(SESSION_KEY);
-    if (!sessionData) return null;
+    if (!sessionData) {
+      console.log('⚠️ [authLocalStorage] 没有找到 session 数据');
+      return null;
+    }
 
+    console.log('✅ [authLocalStorage] 找到 session 数据');
     const session = JSON.parse(sessionData);
-    const users = getUsers();
-    const user = users.find((u) => u.id === session.userId);
+    console.log('📋 [authLocalStorage] session:', session);
 
+    const users = getUsers();
+    console.log('👥 [authLocalStorage] 用户列表数量:', users.length);
+
+    const user = users.find((u) => u.id === session.userId);
     if (!user) {
+      console.log('⚠️ [authLocalStorage] Session中记录的用户不存在，userId:', session.userId);
       // Session中记录的用户不存在，清除session
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
 
+    console.log('✅ [authLocalStorage] 找到用户:', user.username);
     // 返回用户对象（排除密码哈希）
     const { passwordHash, ...userWithoutPassword } = user;
 
@@ -248,9 +258,10 @@ export function getCurrentUser(): any | null {
       userWithoutPassword.role = 'admin';
     }
 
+    console.log('✅ [authLocalStorage] 返回用户信息');
     return userWithoutPassword;
   } catch (error) {
-    console.error('获取当前用户失败:', error);
+    console.error('❌ [authLocalStorage] 获取当前用户失败:', error);
     // 如果解析失败，清除可能损坏的数据
     localStorage.removeItem(SESSION_KEY);
     return null;
