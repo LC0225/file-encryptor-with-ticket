@@ -21,7 +21,7 @@ import { useToast } from '@/components/ToastContext';
 
 interface EncryptedFileResult {
   encryptedData: Uint8Array;
-  encryptedDataBase64: string;
+  encryptedDataBase64: string; // 对于大文件可能为空
   iv: Uint8Array;
   ivBase64: string;
   fileName: string;
@@ -30,6 +30,7 @@ interface EncryptedFileResult {
   algorithm: 'AES-GCM' | 'AES-CBC';
   fileSize: number;
   chunkCount?: number; // 分块数量
+  isLargeFile?: boolean; // 是否为大文件（>50MB）
   createdAt?: string;
 }
 
@@ -136,20 +137,34 @@ export default function Home() {
           }
         );
 
-        // 转换为base64（仅用于历史记录和下载）
-        const base64Result = convertToBase64(result);
+        // 判断是否为大文件（>50MB）
+        const isLargeFile = files[0].size > 50 * 1024 * 1024;
+
+        // 转换为base64（仅用于小文件的下载）
+        let base64Data = '';
+        let base64IV = '';
+        if (!isLargeFile) {
+          const base64Result = convertToBase64(result);
+          base64Data = base64Result.encryptedData;
+          base64IV = base64Result.iv;
+        } else {
+          // 大文件不转换为base64，避免内存溢出
+          const ivBinary = Array.from(result.iv, byte => String.fromCharCode(byte)).join('');
+          base64IV = btoa(ivBinary);
+        }
 
         const encryptedResult: EncryptedFileResult = {
           encryptedData: result.encryptedData,
-          encryptedDataBase64: base64Result.encryptedData,
+          encryptedDataBase64: base64Data,
           iv: result.iv,
-          ivBase64: base64Result.iv,
+          ivBase64: base64IV,
           fileName: files[0].name,
           fileType: files[0].type,
           ticket: ticketToUse,
           algorithm: 'AES-GCM',
           fileSize: files[0].size,
           chunkCount: result.chunkCount,
+          isLargeFile: isLargeFile,
           createdAt: new Date().toISOString(),
         };
         setEncryptedFiles([encryptedResult]);
@@ -185,20 +200,34 @@ export default function Home() {
             }
           );
 
-          // 转换为base64（仅用于下载）
-          const base64Result = convertToBase64(result);
+          // 判断是否为大文件（>50MB）
+          const isLargeFile = file.size > 50 * 1024 * 1024;
+
+          // 转换为base64（仅用于小文件的下载）
+          let base64Data = '';
+          let base64IV = '';
+          if (!isLargeFile) {
+            const base64Result = convertToBase64(result);
+            base64Data = base64Result.encryptedData;
+            base64IV = base64Result.iv;
+          } else {
+            // 大文件不转换为base64，避免内存溢出
+            const ivBinary = Array.from(result.iv, byte => String.fromCharCode(byte)).join('');
+            base64IV = btoa(ivBinary);
+          }
 
           results.push({
             encryptedData: result.encryptedData,
-            encryptedDataBase64: base64Result.encryptedData,
+            encryptedDataBase64: base64Data,
             iv: result.iv,
-            ivBase64: base64Result.iv,
+            ivBase64: base64IV,
             fileName: file.name,
             fileType: file.type,
             ticket: fileTicket,
             algorithm: 'AES-GCM',
             fileSize: file.size,
             chunkCount: result.chunkCount,
+            isLargeFile: isLargeFile,
             createdAt: new Date().toISOString(),
           });
 
@@ -259,20 +288,34 @@ export default function Home() {
           }
         );
 
-        // 转换为base64（仅用于历史记录和下载）
-        const base64Result = convertToBase64(result);
+        // 判断是否为大文件（>50MB）
+        const isLargeFile = files[0].size > 50 * 1024 * 1024;
+
+        // 转换为base64（仅用于小文件的下载）
+        let base64Data = '';
+        let base64IV = '';
+        if (!isLargeFile) {
+          const base64Result = convertToBase64(result);
+          base64Data = base64Result.encryptedData;
+          base64IV = base64Result.iv;
+        } else {
+          // 大文件不转换为base64，避免内存溢出
+          const ivBinary = Array.from(result.iv, byte => String.fromCharCode(byte)).join('');
+          base64IV = btoa(ivBinary);
+        }
 
         const encryptedResult: EncryptedFileResult = {
           encryptedData: result.encryptedData,
-          encryptedDataBase64: base64Result.encryptedData,
+          encryptedDataBase64: base64Data,
           iv: result.iv,
-          ivBase64: base64Result.iv,
+          ivBase64: base64IV,
           fileName: files[0].name,
           fileType: files[0].type,
           ticket: ticketToUse,
           algorithm: 'AES-CBC',
           fileSize: files[0].size,
           chunkCount: result.chunkCount,
+          isLargeFile: isLargeFile,
           createdAt: new Date().toISOString(),
         };
         setEncryptedFiles([encryptedResult]);
@@ -308,20 +351,34 @@ export default function Home() {
             }
           );
 
-          // 转换为base64（仅用于下载）
-          const base64Result = convertToBase64(result);
+          // 判断是否为大文件（>50MB）
+          const isLargeFile = file.size > 50 * 1024 * 1024;
+
+          // 转换为base64（仅用于小文件的下载）
+          let base64Data = '';
+          let base64IV = '';
+          if (!isLargeFile) {
+            const base64Result = convertToBase64(result);
+            base64Data = base64Result.encryptedData;
+            base64IV = base64Result.iv;
+          } else {
+            // 大文件不转换为base64，避免内存溢出
+            const ivBinary = Array.from(result.iv, byte => String.fromCharCode(byte)).join('');
+            base64IV = btoa(ivBinary);
+          }
 
           results.push({
             encryptedData: result.encryptedData,
-            encryptedDataBase64: base64Result.encryptedData,
+            encryptedDataBase64: base64Data,
             iv: result.iv,
-            ivBase64: base64Result.iv,
+            ivBase64: base64IV,
             fileName: file.name,
             fileType: file.type,
             ticket: fileTicket,
             algorithm: 'AES-CBC',
             fileSize: file.size,
             chunkCount: result.chunkCount,
+            isLargeFile: isLargeFile,
             createdAt: new Date().toISOString(),
           });
 
@@ -368,7 +425,10 @@ export default function Home() {
 
     try {
       const file = files[0];
-      const fileContent = await file.text();
+
+      // 判断文件格式（JSON 或 二进制）
+      const fileBuffer = await file.arrayBuffer();
+      const fileView = new DataView(fileBuffer);
 
       let encryptedData: string;
       let iv: string;
@@ -376,20 +436,66 @@ export default function Home() {
       let fileType: string;
       let algorithm: 'AES-GCM' | 'AES-CBC' = 'AES-GCM';
 
-      try {
-        const jsonData = JSON.parse(fileContent);
-        if (!jsonData.data || !jsonData.iv) {
-          throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+      // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
+      const firstUint32 = fileView.getUint32(0, false);
+      const ivLength = firstUint32;
+
+      // 合理的IV长度：GCM是12字节，CBC是16字节
+      if (ivLength === 12 || ivLength === 16) {
+        // 二进制格式
+        let offset = 0;
+
+        // 读取IV
+        offset += 4;
+        const ivBytes = new Uint8Array(fileBuffer, offset, ivLength);
+        offset += ivLength;
+
+        // 读取算法
+        const algorithmLength = fileView.getUint32(offset, false);
+        offset += 4;
+        const algorithmBytes = new Uint8Array(fileBuffer, offset, algorithmLength);
+        algorithm = new TextDecoder().decode(algorithmBytes) as 'AES-GCM' | 'AES-CBC';
+        offset += algorithmLength;
+
+        // 读取文件名
+        const fileNameLength = fileView.getUint32(offset, false);
+        offset += 4;
+        const fileNameBytes = new Uint8Array(fileBuffer, offset, fileNameLength);
+        fileName = new TextDecoder().decode(fileNameBytes);
+        offset += fileNameLength;
+
+        // 读取文件类型
+        const fileTypeLength = fileView.getUint32(offset, false);
+        offset += 4;
+        const fileTypeBytes = new Uint8Array(fileBuffer, offset, fileTypeLength);
+        fileType = new TextDecoder().decode(fileTypeBytes);
+        offset += fileTypeLength;
+
+        // 读取加密数据
+        const encryptedBytes = new Uint8Array(fileBuffer, offset);
+
+        // 转换为base64
+        encryptedData = btoa(String.fromCharCode.apply(null, Array.from(encryptedBytes)));
+        iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
+      } else {
+        // JSON格式
+        const fileContent = await file.text();
+
+        try {
+          const jsonData = JSON.parse(fileContent);
+          if (!jsonData.data || !jsonData.iv) {
+            throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+          }
+          encryptedData = jsonData.data;
+          iv = jsonData.iv;
+          fileName = jsonData.fileName;
+          fileType = jsonData.fileType || 'application/octet-stream';
+          algorithm = jsonData.algorithm || 'AES-GCM';
+        } catch (parseError) {
+          setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
+          setLoading(false);
+          return;
         }
-        encryptedData = jsonData.data;
-        iv = jsonData.iv;
-        fileName = jsonData.fileName;
-        fileType = jsonData.fileType || 'application/octet-stream';
-        algorithm = jsonData.algorithm || 'AES-GCM';
-      } catch (parseError) {
-        setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
-        setLoading(false);
-        return;
       }
 
       // 如果文件是用AES-CBC加密的，提示用户使用AES-CBC解密
@@ -438,7 +544,10 @@ export default function Home() {
 
     try {
       const file = files[0];
-      const fileContent = await file.text();
+
+      // 判断文件格式（JSON 或 二进制）
+      const fileBuffer = await file.arrayBuffer();
+      const fileView = new DataView(fileBuffer);
 
       let encryptedData: string;
       let iv: string;
@@ -446,20 +555,66 @@ export default function Home() {
       let fileType: string;
       let algorithm: 'AES-GCM' | 'AES-CBC' = 'AES-CBC';
 
-      try {
-        const jsonData = JSON.parse(fileContent);
-        if (!jsonData.data || !jsonData.iv) {
-          throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+      // 检查是否为二进制格式（通过查看前4字节判断IV长度是否合理）
+      const firstUint32 = fileView.getUint32(0, false);
+      const ivLength = firstUint32;
+
+      // 合理的IV长度：GCM是12字节，CBC是16字节
+      if (ivLength === 12 || ivLength === 16) {
+        // 二进制格式
+        let offset = 0;
+
+        // 读取IV
+        offset += 4;
+        const ivBytes = new Uint8Array(fileBuffer, offset, ivLength);
+        offset += ivLength;
+
+        // 读取算法
+        const algorithmLength = fileView.getUint32(offset, false);
+        offset += 4;
+        const algorithmBytes = new Uint8Array(fileBuffer, offset, algorithmLength);
+        algorithm = new TextDecoder().decode(algorithmBytes) as 'AES-GCM' | 'AES-CBC';
+        offset += algorithmLength;
+
+        // 读取文件名
+        const fileNameLength = fileView.getUint32(offset, false);
+        offset += 4;
+        const fileNameBytes = new Uint8Array(fileBuffer, offset, fileNameLength);
+        fileName = new TextDecoder().decode(fileNameBytes);
+        offset += fileNameLength;
+
+        // 读取文件类型
+        const fileTypeLength = fileView.getUint32(offset, false);
+        offset += 4;
+        const fileTypeBytes = new Uint8Array(fileBuffer, offset, fileTypeLength);
+        fileType = new TextDecoder().decode(fileTypeBytes);
+        offset += fileTypeLength;
+
+        // 读取加密数据
+        const encryptedBytes = new Uint8Array(fileBuffer, offset);
+
+        // 转换为base64
+        encryptedData = btoa(String.fromCharCode.apply(null, Array.from(encryptedBytes)));
+        iv = btoa(String.fromCharCode.apply(null, Array.from(ivBytes)));
+      } else {
+        // JSON格式
+        const fileContent = await file.text();
+
+        try {
+          const jsonData = JSON.parse(fileContent);
+          if (!jsonData.data || !jsonData.iv) {
+            throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+          }
+          encryptedData = jsonData.data;
+          iv = jsonData.iv;
+          fileName = jsonData.fileName;
+          fileType = jsonData.fileType || 'application/octet-stream';
+          algorithm = jsonData.algorithm || 'AES-CBC';
+        } catch (parseError) {
+          setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
+          setLoading(false);
+          return;
         }
-        encryptedData = jsonData.data;
-        iv = jsonData.iv;
-        fileName = jsonData.fileName;
-        fileType = jsonData.fileType || 'application/octet-stream';
-        algorithm = jsonData.algorithm || 'AES-CBC';
-      } catch (parseError) {
-        setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
-        setLoading(false);
-        return;
       }
 
       // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
@@ -492,23 +647,85 @@ export default function Home() {
   };
 
   const downloadEncryptedFile = (item: EncryptedFileResult) => {
-    const content = JSON.stringify(
-      {
-        data: item.encryptedDataBase64,
-        iv: item.ivBase64,
-        fileName: item.fileName,
-        fileType: item.fileType,
-        algorithm: item.algorithm,
-        chunkCount: item.chunkCount,
-      },
-      null,
-      2
-    );
-    const blob = new Blob([content], { type: 'application/json' });
+    let blob: Blob;
+    let downloadName: string;
+
+    if (item.isLargeFile) {
+      // 大文件：使用二进制格式
+      // 格式: [IV长度(4字节)][IV数据][算法长度(4字节)][算法][文件名长度(4字节)][文件名][文件类型长度(4字节)][文件类型][加密数据]
+
+      const encoder = new TextEncoder();
+      const algorithmBytes = encoder.encode(item.algorithm);
+      const fileNameBytes = encoder.encode(item.fileName);
+      const fileTypeBytes = encoder.encode(item.fileType);
+
+      // 计算总长度
+      const totalLength =
+        4 + // IV长度
+        item.iv.length + // IV数据
+        4 + // 算法长度
+        algorithmBytes.length + // 算法
+        4 + // 文件名长度
+        fileNameBytes.length + // 文件名
+        4 + // 文件类型长度
+        fileTypeBytes.length + // 文件类型
+        item.encryptedData.length; // 加密数据
+
+      const buffer = new Uint8Array(totalLength);
+      let offset = 0;
+
+      // 写入IV
+      const ivLength = item.iv.length;
+      new DataView(buffer.buffer).setUint32(offset, ivLength, false); // 大端序
+      offset += 4;
+      buffer.set(item.iv, offset);
+      offset += ivLength;
+
+      // 写入算法
+      new DataView(buffer.buffer).setUint32(offset, algorithmBytes.length, false);
+      offset += 4;
+      buffer.set(algorithmBytes, offset);
+      offset += algorithmBytes.length;
+
+      // 写入文件名
+      new DataView(buffer.buffer).setUint32(offset, fileNameBytes.length, false);
+      offset += 4;
+      buffer.set(fileNameBytes, offset);
+      offset += fileNameBytes.length;
+
+      // 写入文件类型
+      new DataView(buffer.buffer).setUint32(offset, fileTypeBytes.length, false);
+      offset += 4;
+      buffer.set(fileTypeBytes, offset);
+      offset += fileTypeBytes.length;
+
+      // 写入加密数据
+      buffer.set(item.encryptedData, offset);
+
+      blob = new Blob([buffer], { type: 'application/octet-stream' });
+      downloadName = `${item.fileName}.encrypted`;
+    } else {
+      // 小文件：使用JSON格式
+      const content = JSON.stringify(
+        {
+          data: item.encryptedDataBase64,
+          iv: item.ivBase64,
+          fileName: item.fileName,
+          fileType: item.fileType,
+          algorithm: item.algorithm,
+          chunkCount: item.chunkCount,
+        },
+        null,
+        2
+      );
+      blob = new Blob([content], { type: 'application/json' });
+      downloadName = `${item.fileName}.encrypted`;
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${item.fileName}.encrypted`;
+    a.download = downloadName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
