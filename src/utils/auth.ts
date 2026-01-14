@@ -13,6 +13,14 @@ const TOKEN_KEY = 'crypto_auth_token';
 const SESSION_KEY = 'crypto_session';
 
 /**
+ * 获取认证token
+ */
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+/**
  * 密码要求检查
  */
 export function validatePassword(password: string): { valid: boolean; message: string } {
