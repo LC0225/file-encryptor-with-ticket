@@ -118,14 +118,6 @@ export default function Profile() {
     }
   };
 
-  const downloadAllEncryptedFiles = () => {
-    history.forEach((item, index) => {
-      setTimeout(() => {
-        handleDownloadEncryptedFile(item);
-      }, index * 500);
-    });
-  };
-
   const handleManualSync = async () => {
     setSyncMessage(null);
     setSyncMessageType(null);
@@ -250,14 +242,6 @@ export default function Profile() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              {history.length > 1 && (
-                <button
-                  onClick={downloadAllEncryptedFiles}
-                  className="w-full sm:w-auto rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-700"
-                >
-                  下载所有文件
-                </button>
-              )}
               {history.length > 0 && (
                 <button
                   onClick={handleClearAll}
