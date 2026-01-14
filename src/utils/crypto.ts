@@ -3,6 +3,7 @@ export interface EncryptionResult {
   iv: string;
   fileName: string;
   fileType: string;
+  algorithm: 'AES-GCM' | 'AES-CBC';
 }
 
 export interface DecryptionResult {
@@ -46,9 +47,9 @@ export function generateTicket(): string {
 }
 
 /**
- * 从ticket生成加密密钥
+ * 从ticket生成AES-GCM加密密钥
  */
-async function deriveKey(ticket: string): Promise<CryptoKey> {
+async function deriveKeyGCM(ticket: string): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -61,7 +62,7 @@ async function deriveKey(ticket: string): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: encoder.encode('file-encryption-salt'),
+      salt: encoder.encode('file-encryption-gcm-salt'),
       iterations: 100000,
       hash: 'SHA-256',
     },
@@ -73,12 +74,39 @@ async function deriveKey(ticket: string): Promise<CryptoKey> {
 }
 
 /**
- * 加密文件
+ * 从ticket生成AES-CBC加密密钥
  */
-export async function encryptFile(file: File, ticket: string): Promise<EncryptionResult> {
+async function deriveKeyCBC(ticket: string): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(ticket),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('file-encryption-cbc-salt'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-CBC', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * 使用AES-GCM加密文件
+ */
+export async function encryptFileGCM(file: File, ticket: string): Promise<EncryptionResult> {
   const fileData = await file.arrayBuffer();
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const key = await deriveKey(ticket);
+  const key = await deriveKeyGCM(ticket);
 
   const encryptedData = await crypto.subtle.encrypt(
     {
@@ -94,27 +122,55 @@ export async function encryptFile(file: File, ticket: string): Promise<Encryptio
     iv: arrayBufferToBase64(iv.buffer),
     fileName: file.name,
     fileType: file.type,
+    algorithm: 'AES-GCM',
   };
 }
 
 /**
- * 解密文件
+ * 使用AES-CBC加密文件
+ */
+export async function encryptFileCBC(file: File, ticket: string): Promise<EncryptionResult> {
+  const fileData = await file.arrayBuffer();
+  const iv = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKeyCBC(ticket);
+
+  const encryptedData = await crypto.subtle.encrypt(
+    {
+      name: 'AES-CBC',
+      iv: iv,
+    },
+    key,
+    fileData
+  );
+
+  return {
+    encryptedData: arrayBufferToBase64(encryptedData),
+    iv: arrayBufferToBase64(iv.buffer),
+    fileName: file.name,
+    fileType: file.type,
+    algorithm: 'AES-CBC',
+  };
+}
+
+/**
+ * 解密文件（自动检测算法）
  */
 export async function decryptFile(
   encryptedData: string,
   iv: string,
   ticket: string,
   originalFileName: string,
-  originalFileType: string
+  originalFileType: string,
+  algorithm: 'AES-GCM' | 'AES-CBC' = 'AES-GCM'
 ): Promise<DecryptionResult> {
-  const key = await deriveKey(ticket);
+  const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
   const encryptedBuffer = base64ToArrayBuffer(encryptedData) as BufferSource;
   const ivBuffer = base64ToArrayBuffer(iv) as BufferSource;
 
   try {
     const decryptedData = await crypto.subtle.decrypt(
       {
-        name: 'AES-GCM',
+        name: algorithm,
         iv: ivBuffer,
       },
       key,
@@ -129,6 +185,14 @@ export async function decryptFile(
   } catch (error) {
     throw new Error('解密失败：ticket不正确或数据已损坏');
   }
+}
+
+/**
+ * 向后兼容的加密函数（默认使用AES-GCM）
+ * @deprecated 请使用 encryptFileGCM 或 encryptFileCBC
+ */
+export async function encryptFile(file: File, ticket: string): Promise<EncryptionResult> {
+  return encryptFileGCM(file, ticket);
 }
 
 /**

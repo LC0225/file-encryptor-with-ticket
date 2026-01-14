@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  encryptFile,
-  encryptFiles,
+  encryptFileGCM,
+  encryptFileCBC,
   decryptFile,
   generateTicket,
 } from '@/utils/crypto';
@@ -19,6 +19,7 @@ interface EncryptedFileResult {
   fileName: string;
   fileType: string;
   ticket: string;
+  algorithm: 'AES-GCM' | 'AES-CBC';
 }
 
 export default function Home() {
@@ -38,6 +39,7 @@ export default function Home() {
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
+  const [algorithm, setAlgorithm] = useState<'AES-GCM' | 'AES-CBC'>('AES-GCM');
 
   // 加载用户信息
   useEffect(() => {
@@ -74,7 +76,7 @@ export default function Home() {
     setSuccess('');
   };
 
-  const handleEncrypt = async () => {
+  const handleEncryptGCM = async () => {
     if (files.length === 0) {
       setError('请选择要加密的文件');
       return;
@@ -92,33 +94,43 @@ export default function Home() {
         if (!ticket) {
           setTicket(ticketToUse);
         }
-        const result = await encryptFile(files[0], ticketToUse);
+        const result = await encryptFileGCM(files[0], ticketToUse);
         const encryptedResult: EncryptedFileResult = {
           encryptedData: result.encryptedData,
           iv: result.iv,
           fileName: result.fileName,
           fileType: result.fileType,
           ticket: ticketToUse,
+          algorithm: 'AES-GCM',
         };
         setEncryptedFiles([encryptedResult]);
-        
+
         // 保存到历史记录
         addEncryptionHistory(result, ticketToUse, files[0].size);
       } else {
         // 多文件加密：每个文件独立ticket
-        const results = await encryptFiles(files);
-        setEncryptedFiles(results);
-        
-        // 保存到历史记录
-        for (let i = 0; i < results.length; i++) {
-          addEncryptionHistory(results[i], results[i].ticket, files[i].size);
+        const results: EncryptedFileResult[] = [];
+        for (const file of files) {
+          const ticket = generateTicket();
+          const result = await encryptFileGCM(file, ticket);
+          results.push({
+            encryptedData: result.encryptedData,
+            iv: result.iv,
+            fileName: result.fileName,
+            fileType: result.fileType,
+            ticket,
+            algorithm: 'AES-GCM',
+          });
+          // 保存到历史记录
+          addEncryptionHistory(result, ticket, file.size);
         }
-        
-        setSuccess(`成功加密 ${files.length} 个文件，每个文件都有独立的ticket`);
+        setEncryptedFiles(results);
+
+        setSuccess(`成功使用AES-GCM加密 ${files.length} 个文件，每个文件都有独立的ticket`);
       }
-      
+
       if (files.length === 1) {
-        setSuccess('文件加密成功！');
+        setSuccess('AES-GCM文件加密成功！');
       }
     } catch (err) {
       setError('加密失败：' + (err as Error).message);
@@ -127,7 +139,70 @@ export default function Home() {
     }
   };
 
-  const handleDecrypt = async () => {
+  const handleEncryptCBC = async () => {
+    if (files.length === 0) {
+      setError('请选择要加密的文件');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setEncryptedFiles([]);
+
+    try {
+      if (files.length === 1) {
+        // 单文件加密：使用手动输入的ticket或自动生成
+        const ticketToUse = ticket || generateTicket();
+        if (!ticket) {
+          setTicket(ticketToUse);
+        }
+        const result = await encryptFileCBC(files[0], ticketToUse);
+        const encryptedResult: EncryptedFileResult = {
+          encryptedData: result.encryptedData,
+          iv: result.iv,
+          fileName: result.fileName,
+          fileType: result.fileType,
+          ticket: ticketToUse,
+          algorithm: 'AES-CBC',
+        };
+        setEncryptedFiles([encryptedResult]);
+
+        // 保存到历史记录
+        addEncryptionHistory(result, ticketToUse, files[0].size);
+      } else {
+        // 多文件加密：每个文件独立ticket
+        const results: EncryptedFileResult[] = [];
+        for (const file of files) {
+          const ticket = generateTicket();
+          const result = await encryptFileCBC(file, ticket);
+          results.push({
+            encryptedData: result.encryptedData,
+            iv: result.iv,
+            fileName: result.fileName,
+            fileType: result.fileType,
+            ticket,
+            algorithm: 'AES-CBC',
+          });
+          // 保存到历史记录
+          addEncryptionHistory(result, ticket, file.size);
+        }
+        setEncryptedFiles(results);
+
+        setSuccess(`成功使用AES-CBC加密 ${files.length} 个文件，每个文件都有独立的ticket`);
+      }
+
+      if (files.length === 1) {
+        setSuccess('AES-CBC文件加密成功！');
+      }
+    } catch (err) {
+      setError('加密失败：' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDecryptGCM = async () => {
     if (files.length === 0) {
       setError('请选择加密的文件');
       return;
@@ -145,11 +220,12 @@ export default function Home() {
     try {
       const file = files[0];
       const fileContent = await file.text();
-      
+
       let encryptedData: string;
       let iv: string;
       let fileName: string;
       let fileType: string;
+      let algorithm: 'AES-GCM' | 'AES-CBC' = 'AES-GCM';
 
       try {
         const jsonData = JSON.parse(fileContent);
@@ -157,6 +233,7 @@ export default function Home() {
         iv = jsonData.iv;
         fileName = jsonData.fileName;
         fileType = jsonData.fileType || 'application/octet-stream';
+        algorithm = jsonData.algorithm || 'AES-GCM';
       } catch {
         encryptedData = fileContent;
         iv = '';
@@ -164,23 +241,100 @@ export default function Home() {
         fileType = 'application/octet-stream';
       }
 
+      // 如果文件是用AES-CBC加密的，提示用户使用AES-CBC解密
+      if (algorithm === 'AES-CBC') {
+        setError('此文件使用AES-CBC加密，请使用AES-CBC解密按钮');
+        setLoading(false);
+        return;
+      }
+
       const result = await decryptFile(
         encryptedData,
         iv,
         ticket,
         fileName,
-        fileType
+        fileType,
+        'AES-GCM'
       );
-      
+
       setDecryptedFile({
         data: result.decryptedData,
         fileName: result.fileName,
         fileType: result.fileType,
       });
-      
-      setSuccess('文件解密成功！');
+
+      setSuccess('AES-GCM文件解密成功！');
     } catch (err) {
-      setError('解密失败：' + (err as Error).message);
+      setError('AES-GCM解密失败：' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDecryptCBC = async () => {
+    if (files.length === 0) {
+      setError('请选择加密的文件');
+      return;
+    }
+
+    if (!ticket) {
+      setError('请输入解密ticket');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const file = files[0];
+      const fileContent = await file.text();
+
+      let encryptedData: string;
+      let iv: string;
+      let fileName: string;
+      let fileType: string;
+      let algorithm: 'AES-GCM' | 'AES-CBC' = 'AES-CBC';
+
+      try {
+        const jsonData = JSON.parse(fileContent);
+        encryptedData = jsonData.data;
+        iv = jsonData.iv;
+        fileName = jsonData.fileName;
+        fileType = jsonData.fileType || 'application/octet-stream';
+        algorithm = jsonData.algorithm || 'AES-CBC';
+      } catch {
+        encryptedData = fileContent;
+        iv = '';
+        fileName = file.name.replace('.encrypted', '');
+        fileType = 'application/octet-stream';
+      }
+
+      // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
+      if (algorithm === 'AES-GCM') {
+        setError('此文件使用AES-GCM加密，请使用AES-GCM解密按钮');
+        setLoading(false);
+        return;
+      }
+
+      const result = await decryptFile(
+        encryptedData,
+        iv,
+        ticket,
+        fileName,
+        fileType,
+        'AES-CBC'
+      );
+
+      setDecryptedFile({
+        data: result.decryptedData,
+        fileName: result.fileName,
+        fileType: result.fileType,
+      });
+
+      setSuccess('AES-CBC文件解密成功！');
+    } catch (err) {
+      setError('AES-CBC解密失败：' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -193,6 +347,7 @@ export default function Home() {
         iv: item.iv,
         fileName: item.fileName,
         fileType: item.fileType,
+        algorithm: item.algorithm,
       },
       null,
       2
@@ -450,19 +605,49 @@ export default function Home() {
             )}
 
             {/* 操作按钮 */}
-            <button
-              onClick={mode === 'encrypt' ? handleEncrypt : handleDecrypt}
-              disabled={loading || files.length === 0}
-              className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
-            >
-              {loading
-                ? '处理中...'
-                : mode === 'encrypt'
-                ? files.length > 1
-                  ? `批量加密 ${files.length} 个文件`
-                  : '加密文件'
-                : '解密文件'}
-            </button>
+            {mode === 'encrypt' ? (
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={handleEncryptGCM}
+                  disabled={loading || files.length === 0}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
+                >
+                  {loading
+                    ? '处理中...'
+                    : files.length > 1
+                    ? `AES-GCM批量加密 ${files.length} 个文件`
+                    : 'AES-GCM加密文件'}
+                </button>
+                <button
+                  onClick={handleEncryptCBC}
+                  disabled={loading || files.length === 0}
+                  className="w-full rounded-lg bg-purple-600 px-4 py-3 font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
+                >
+                  {loading
+                    ? '处理中...'
+                    : files.length > 1
+                    ? `AES-CBC批量加密 ${files.length} 个文件`
+                    : 'AES-CBC加密文件'}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={handleDecryptGCM}
+                  disabled={loading || files.length === 0}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
+                >
+                  {loading ? '处理中...' : 'AES-GCM解密文件'}
+                </button>
+                <button
+                  onClick={handleDecryptCBC}
+                  disabled={loading || files.length === 0}
+                  className="w-full rounded-lg bg-purple-600 px-4 py-3 font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
+                >
+                  {loading ? '处理中...' : 'AES-CBC解密文件'}
+                </button>
+              </div>
+            )}
 
             {/* 错误提示 */}
             {error && (
@@ -510,6 +695,9 @@ export default function Home() {
                           </h3>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getFileTypeColor(item.fileType)}`}>
                             {getFileTypeLabel(item.fileType)}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.algorithm === 'AES-GCM' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}>
+                            {item.algorithm}
                           </span>
                         </div>
                       </div>
@@ -626,10 +814,32 @@ export default function Home() {
               <li>• 支持PDF、Word、Excel、PPT、图片、视频、音频等常用文件类型</li>
               <li>• 批量加密时，每个文件会生成独立的ticket，更安全</li>
               <li>• 加密后的文件保存为.json格式的加密文件</li>
-              <li>• 解密时需要使用对应文件的ticket</li>
+              <li>• 解密时需要使用对应文件的ticket和正确的加密算法</li>
               <li>• 所有加密历史记录保存在个人中心</li>
               <li>• 请妥善保管ticket，丢失后无法解密文件</li>
             </ul>
+
+            <h4 className="mt-4 mb-2 font-semibold text-gray-900 dark:text-white">
+              加密算法说明
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                <h5 className="mb-2 font-medium text-blue-900 dark:text-blue-300">AES-GCM</h5>
+                <p className="text-gray-700 dark:text-gray-300">
+                  • 认证加密模式，同时提供机密性和完整性
+                  <br/>• 推荐：适合大多数场景，安全性更高
+                  <br/>• IV长度：12字节
+                </p>
+              </div>
+              <div className="rounded-lg bg-purple-50 p-4 dark:bg-purple-900/20">
+                <h5 className="mb-2 font-medium text-purple-900 dark:text-purple-300">AES-CBC</h5>
+                <p className="text-gray-700 dark:text-gray-300">
+                  • 经典加密模式，提供机密性
+                  <br/>• 兼容性：与更多旧系统兼容
+                  <br/>• IV长度：16字节
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </main>
