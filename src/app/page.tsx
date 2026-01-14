@@ -9,6 +9,7 @@ import {
   decryptFile,
   generateTicket,
 } from '@/utils/crypto';
+import { encryptFileWithWorker } from '@/utils/cryptoWorker';
 import { addEncryptionHistory } from '@/utils/storage';
 import { getCurrentUser, logoutUser, isLoggedIn, isAdmin } from '@/utils/auth';
 import { useToast } from '@/components/ToastContext';
@@ -43,6 +44,12 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<{id:string; username:string; email?: string; role:'admin'|'user'} | null>(null);
   const [algorithm, setAlgorithm] = useState<'AES-GCM' | 'AES-CBC'>('AES-GCM');
   const [isMounted, setIsMounted] = useState(false);
+  const [encryptionProgress, setEncryptionProgress] = useState({
+    progress: 0,
+    currentChunk: 0,
+    totalChunks: 0
+  });
+  const [showProgress, setShowProgress] = useState(false);
 
   // 确保在客户端挂载后再渲染动态内容
   useEffect(() => {
@@ -97,9 +104,11 @@ export default function Home() {
     }
 
     setLoading(true);
+    setShowProgress(true);
     setError('');
     setSuccess('');
     setEncryptedFiles([]);
+    setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
 
     try {
       if (files.length === 1) {
@@ -108,12 +117,22 @@ export default function Home() {
         if (!ticket) {
           setTicket(ticketToUse);
         }
-        const result = await encryptFileGCM(files[0], ticketToUse);
+
+        // 使用Worker进行分块加密，避免阻塞主线程
+        const result = await encryptFileWithWorker(
+          files[0],
+          ticketToUse,
+          'AES-GCM',
+          (progress) => {
+            setEncryptionProgress(progress);
+          }
+        );
+
         const encryptedResult: EncryptedFileResult = {
           encryptedData: result.encryptedData,
           iv: result.iv,
-          fileName: result.fileName,
-          fileType: result.fileType,
+          fileName: files[0].name,
+          fileType: files[0].type,
           ticket: ticketToUse,
           algorithm: 'AES-GCM',
           fileSize: files[0].size,
@@ -122,25 +141,54 @@ export default function Home() {
         setEncryptedFiles([encryptedResult]);
 
         // 保存到历史记录
-        addEncryptionHistory(result, ticketToUse, files[0].size);
+        addEncryptionHistory({
+          encryptedData: result.encryptedData,
+          iv: result.iv,
+          fileName: files[0].name,
+          fileType: files[0].type,
+          algorithm: 'AES-GCM'
+        }, ticketToUse, files[0].size);
       } else {
         // 多文件加密：每个文件独立ticket
         const results: EncryptedFileResult[] = [];
-        for (const file of files) {
-          const ticket = generateTicket();
-          const result = await encryptFileGCM(file, ticket);
+        let totalFiles = files.length;
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileTicket = generateTicket();
+
+          // 使用Worker进行分块加密
+          const result = await encryptFileWithWorker(
+            file,
+            fileTicket,
+            'AES-GCM',
+            (progress) => {
+              setEncryptionProgress({
+                progress: (i / totalFiles * 100) + (progress.progress / totalFiles),
+                currentChunk: i + 1,
+                totalChunks: totalFiles
+              });
+            }
+          );
+
           results.push({
             encryptedData: result.encryptedData,
             iv: result.iv,
-            fileName: result.fileName,
-            fileType: result.fileType,
-            ticket,
+            fileName: file.name,
+            fileType: file.type,
+            ticket: fileTicket,
             algorithm: 'AES-GCM',
             fileSize: file.size,
             createdAt: new Date().toISOString(),
           });
           // 保存到历史记录
-          addEncryptionHistory(result, ticket, file.size);
+          addEncryptionHistory({
+            encryptedData: result.encryptedData,
+            iv: result.iv,
+            fileName: file.name,
+            fileType: file.type,
+            algorithm: 'AES-GCM'
+          }, fileTicket, file.size);
         }
         setEncryptedFiles(results);
 
@@ -154,6 +202,8 @@ export default function Home() {
       setError('加密失败：' + (err as Error).message);
     } finally {
       setLoading(false);
+      setShowProgress(false);
+      setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
     }
   };
 
@@ -164,9 +214,11 @@ export default function Home() {
     }
 
     setLoading(true);
+    setShowProgress(true);
     setError('');
     setSuccess('');
     setEncryptedFiles([]);
+    setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
 
     try {
       if (files.length === 1) {
@@ -175,12 +227,22 @@ export default function Home() {
         if (!ticket) {
           setTicket(ticketToUse);
         }
-        const result = await encryptFileCBC(files[0], ticketToUse);
+
+        // 使用Worker进行分块加密，避免阻塞主线程
+        const result = await encryptFileWithWorker(
+          files[0],
+          ticketToUse,
+          'AES-CBC',
+          (progress) => {
+            setEncryptionProgress(progress);
+          }
+        );
+
         const encryptedResult: EncryptedFileResult = {
           encryptedData: result.encryptedData,
           iv: result.iv,
-          fileName: result.fileName,
-          fileType: result.fileType,
+          fileName: files[0].name,
+          fileType: files[0].type,
           ticket: ticketToUse,
           algorithm: 'AES-CBC',
           fileSize: files[0].size,
@@ -189,25 +251,54 @@ export default function Home() {
         setEncryptedFiles([encryptedResult]);
 
         // 保存到历史记录
-        addEncryptionHistory(result, ticketToUse, files[0].size);
+        addEncryptionHistory({
+          encryptedData: result.encryptedData,
+          iv: result.iv,
+          fileName: files[0].name,
+          fileType: files[0].type,
+          algorithm: 'AES-CBC'
+        }, ticketToUse, files[0].size);
       } else {
         // 多文件加密：每个文件独立ticket
         const results: EncryptedFileResult[] = [];
-        for (const file of files) {
-          const ticket = generateTicket();
-          const result = await encryptFileCBC(file, ticket);
+        let totalFiles = files.length;
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileTicket = generateTicket();
+
+          // 使用Worker进行分块加密
+          const result = await encryptFileWithWorker(
+            file,
+            fileTicket,
+            'AES-CBC',
+            (progress) => {
+              setEncryptionProgress({
+                progress: (i / totalFiles * 100) + (progress.progress / totalFiles),
+                currentChunk: i + 1,
+                totalChunks: totalFiles
+              });
+            }
+          );
+
           results.push({
             encryptedData: result.encryptedData,
             iv: result.iv,
-            fileName: result.fileName,
-            fileType: result.fileType,
-            ticket,
+            fileName: file.name,
+            fileType: file.type,
+            ticket: fileTicket,
             algorithm: 'AES-CBC',
             fileSize: file.size,
             createdAt: new Date().toISOString(),
           });
           // 保存到历史记录
-          addEncryptionHistory(result, ticket, file.size);
+          addEncryptionHistory({
+            encryptedData: result.encryptedData,
+            iv: result.iv,
+            fileName: file.name,
+            fileType: file.type,
+            algorithm: 'AES-CBC'
+          }, fileTicket, file.size);
         }
         setEncryptedFiles(results);
 
@@ -221,6 +312,8 @@ export default function Home() {
       setError('加密失败：' + (err as Error).message);
     } finally {
       setLoading(false);
+      setShowProgress(false);
+      setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
     }
   };
 
@@ -413,6 +506,8 @@ export default function Home() {
     setDecryptedFile(null);
     setError('');
     setSuccess('');
+    setShowProgress(false);
+    setEncryptionProgress({ progress: 0, currentChunk: 0, totalChunks: 0 });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -655,24 +750,40 @@ export default function Home() {
                 <button
                   onClick={handleEncryptGCM}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-blue-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
                 >
-                  {loading
-                    ? '处理中...'
-                    : files.length > 1
-                    ? `AES-GCM批量加密 ${files.length} 个文件`
-                    : 'AES-GCM加密文件'}
+                  {loading ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {files.length > 1 ? `AES-GCM批量加密 ${files.length} 个文件` : 'AES-GCM加密文件'}
+                    </>
+                  ) : files.length > 1 ? (
+                    `AES-GCM批量加密 ${files.length} 个文件`
+                  ) : (
+                    'AES-GCM加密文件'
+                  )}
                 </button>
                 <button
                   onClick={handleEncryptCBC}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-purple-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
                 >
-                  {loading
-                    ? '处理中...'
-                    : files.length > 1
-                    ? `AES-CBC批量加密 ${files.length} 个文件`
-                    : 'AES-CBC加密文件'}
+                  {loading ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {files.length > 1 ? `AES-CBC批量加密 ${files.length} 个文件` : 'AES-CBC加密文件'}
+                    </>
+                  ) : files.length > 1 ? (
+                    `AES-CBC批量加密 ${files.length} 个文件`
+                  ) : (
+                    'AES-CBC加密文件'
+                  )}
                 </button>
               </div>
             ) : (
@@ -680,17 +791,70 @@ export default function Home() {
                 <button
                   onClick={handleDecryptGCM}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-blue-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-blue-700 dark:disabled:bg-gray-600"
                 >
-                  {loading ? '处理中...' : 'AES-GCM解密文件'}
+                  {loading ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      AES-GCM解密文件
+                    </>
+                  ) : (
+                    'AES-GCM解密文件'
+                  )}
                 </button>
                 <button
                   onClick={handleDecryptCBC}
                   disabled={loading || files.length === 0}
-                  className="w-full rounded-lg bg-purple-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-3 sm:px-4 py-3 text-sm sm:text-base font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:hover:bg-purple-700 dark:disabled:bg-gray-600"
                 >
-                  {loading ? '处理中...' : 'AES-CBC解密文件'}
+                  {loading ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      AES-CBC解密文件
+                    </>
+                  ) : (
+                    'AES-CBC解密文件'
+                  )}
                 </button>
+              </div>
+            )}
+
+            {/* 加密进度条 */}
+            {showProgress && (
+              <div className="mt-6 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                    加密进度
+                  </span>
+                  <span className="text-sm text-blue-700 dark:text-blue-400">
+                    {Math.round(encryptionProgress.progress)}%
+                  </span>
+                </div>
+                <div className="mb-2 h-2.5 overflow-hidden rounded-full bg-blue-200 dark:bg-blue-800">
+                  <div
+                    className="h-full rounded-full bg-blue-600 transition-all duration-300 ease-out dark:bg-blue-500"
+                    style={{ width: `${encryptionProgress.progress}%` }}
+                  ></div>
+                </div>
+                {files.length > 1 ? (
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    正在处理第 {encryptionProgress.currentChunk} / {encryptionProgress.totalChunks} 个文件
+                  </p>
+                ) : encryptionProgress.totalChunks > 0 ? (
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    正在处理第 {encryptionProgress.currentChunk} / {encryptionProgress.totalChunks} 个数据块
+                  </p>
+                ) : (
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    正在准备加密...
+                  </p>
+                )}
               </div>
             )}
 
