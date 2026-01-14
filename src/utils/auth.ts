@@ -203,6 +203,8 @@ export async function getCurrentUser(): Promise<User | null> {
     const tokenData = JSON.parse(atob(token));
     if (tokenData && tokenData.id && tokenData.username) {
       console.log('🔧 从旧token恢复session:', tokenData.username);
+      
+      // 保存session到localStorage
       const session = {
         userId: tokenData.id,
         username: tokenData.username,
@@ -210,8 +212,23 @@ export async function getCurrentUser(): Promise<User | null> {
         loginTime: tokenData.loginTime || new Date().toISOString(),
       };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      console.log('✅ 已从token恢复session，重新获取用户');
-      return authLocalStorage.getCurrentUser();
+      
+      // 尝试从localStorage获取完整用户信息
+      const userFromSession = authLocalStorage.getCurrentUser();
+      if (userFromSession) {
+        console.log('✅ 从token恢复session并获取到用户:', userFromSession.username);
+        return userFromSession;
+      }
+      
+      // 如果localStorage用户列表为空，直接返回token中的用户信息
+      console.log('🔧 localStorage用户列表为空，直接使用token中的用户信息');
+      return {
+        id: tokenData.id,
+        username: tokenData.username,
+        email: tokenData.email,
+        role: tokenData.role || 'user',
+        createdAt: tokenData.createdAt,
+      };
     }
   } catch (error) {
     console.log('⚠️ 无法从token解析用户信息，尝试从数据库获取');
