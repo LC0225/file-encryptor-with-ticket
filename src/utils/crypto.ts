@@ -29,7 +29,24 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * 将base64字符串转换为Uint8Array
  */
 function base64ToArrayBuffer(base64: string): Uint8Array {
-  const binaryString = atob(base64);
+  // 检查输入
+  if (typeof base64 !== 'string') {
+    throw new Error('base64 input is not a string');
+  }
+
+  // 清理字符串：移除空格、换行符等
+  const cleanBase64 = base64.replace(/[\s\r\n]/g, '');
+
+  // 检查 base64 格式
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
+    throw new Error('base64 string contains invalid characters');
+  }
+
+  if (cleanBase64.length === 0) {
+    throw new Error('base64 string is empty');
+  }
+
+  const binaryString = atob(cleanBase64);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);

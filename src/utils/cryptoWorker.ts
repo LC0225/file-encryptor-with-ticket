@@ -217,9 +217,36 @@ self.addEventListener('message', async (e) => {
       // 解密功能（不分块）
       const { encryptedData, iv, ticket, algorithm } = data;
 
+      // 更健壮的 base64 解码函数
+      function base64ToArrayBuffer(base64) {
+        // 检查输入
+        if (typeof base64 !== 'string') {
+          throw new Error('Base64 input is not a string');
+        }
+
+        // 清理字符串：移除空格、换行符等
+        const cleanBase64 = base64.replace(/[\\s\\r\\n]/g, '');
+
+        // 检查 base64 格式
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
+          throw new Error('Base64 string contains invalid characters');
+        }
+
+        if (cleanBase64.length === 0) {
+          throw new Error('Base64 string is empty');
+        }
+
+        const binaryString = atob(cleanBase64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+      }
+
       const key = algorithm === 'AES-GCM' ? await deriveKeyGCM(ticket) : await deriveKeyCBC(ticket);
-      const encryptedBuffer = new Uint8Array(atob(encryptedData).split('').map(c => c.charCodeAt(0)));
-      const ivBuffer = new Uint8Array(atob(iv).split('').map(c => c.charCodeAt(0)));
+      const encryptedBuffer = base64ToArrayBuffer(encryptedData, 'encryptedData');
+      const ivBuffer = base64ToArrayBuffer(iv, 'iv');
 
       const decryptedData = await crypto.subtle.decrypt(
         {

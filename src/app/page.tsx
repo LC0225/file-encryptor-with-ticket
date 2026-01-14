@@ -378,16 +378,18 @@ export default function Home() {
 
       try {
         const jsonData = JSON.parse(fileContent);
+        if (!jsonData.data || !jsonData.iv) {
+          throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+        }
         encryptedData = jsonData.data;
         iv = jsonData.iv;
         fileName = jsonData.fileName;
         fileType = jsonData.fileType || 'application/octet-stream';
         algorithm = jsonData.algorithm || 'AES-GCM';
-      } catch {
-        encryptedData = fileContent;
-        iv = '';
-        fileName = file.name.replace('.encrypted', '');
-        fileType = 'application/octet-stream';
+      } catch (parseError) {
+        setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
+        setLoading(false);
+        return;
       }
 
       // 如果文件是用AES-CBC加密的，提示用户使用AES-CBC解密
@@ -446,16 +448,18 @@ export default function Home() {
 
       try {
         const jsonData = JSON.parse(fileContent);
+        if (!jsonData.data || !jsonData.iv) {
+          throw new Error('加密文件格式不正确：缺少 data 或 iv 字段');
+        }
         encryptedData = jsonData.data;
         iv = jsonData.iv;
         fileName = jsonData.fileName;
         fileType = jsonData.fileType || 'application/octet-stream';
         algorithm = jsonData.algorithm || 'AES-CBC';
-      } catch {
-        encryptedData = fileContent;
-        iv = '';
-        fileName = file.name.replace('.encrypted', '');
-        fileType = 'application/octet-stream';
+      } catch (parseError) {
+        setError(`加密文件解析失败：${(parseError as Error).message}。请确保选择了正确的 .encrypted 文件。`);
+        setLoading(false);
+        return;
       }
 
       // 如果文件是用AES-GCM加密的，提示用户使用AES-GCM解密
