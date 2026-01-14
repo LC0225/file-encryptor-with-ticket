@@ -476,6 +476,8 @@ export default function Home() {
         return;
       }
 
+      console.log('正在解密文件:', file.name, '大小:', file.size);
+
       // 判断文件格式（JSON 或 二进制）
       const fileBuffer = await file.arrayBuffer();
       const fileView = new DataView(fileBuffer);
@@ -494,8 +496,20 @@ export default function Home() {
         // JSON 格式（小文件）
         const fileContent = await file.text();
 
+        console.log('文件内容预览（前200字符）:', fileContent.substring(0, 200));
+
         try {
           const jsonData = JSON.parse(fileContent);
+          console.log('解析到的JSON数据:', {
+            hasData: !!jsonData.data,
+            dataLength: jsonData.data ? jsonData.data.length : 0,
+            hasIv: !!jsonData.iv,
+            ivLength: jsonData.iv ? jsonData.iv.length : 0,
+            fileName: jsonData.fileName,
+            fileType: jsonData.fileType,
+            algorithm: jsonData.algorithm
+          });
+
           if (!jsonData.data) {
             throw new Error('加密文件中缺少加密数据（data字段）');
           }
@@ -503,7 +517,7 @@ export default function Home() {
             throw new Error('加密文件中缺少IV（iv字段）');
           }
           if (jsonData.data.length === 0) {
-            throw new Error('加密数据为空（data字段为空字符串）');
+            throw new Error(`加密数据为空（data字段为空字符串）。文件大小：${file.size} 字节`);
           }
           if (jsonData.iv.length === 0) {
             throw new Error('IV为空（iv字段为空字符串）');
@@ -656,6 +670,8 @@ export default function Home() {
         setShowProgress(false);
         return;
       }
+
+      console.log('正在解密文件:', file.name, '大小:', file.size);
 
       // 判断文件格式（JSON 或 二进制）
       const fileBuffer = await file.arrayBuffer();
@@ -868,10 +884,24 @@ export default function Home() {
       downloadName = `${item.fileName}.encrypted`;
     } else {
       // 小文件：使用JSON格式
+      // 注意：必须使用 encryptedDataBase64，而不是 encryptedData（Uint8Array）
+      const encryptedDataBase64 = item.encryptedDataBase64 || '';
+      const ivBase64 = item.ivBase64 || '';
+
+      if (!encryptedDataBase64 || encryptedDataBase64.length === 0) {
+        console.error('加密文件下载失败：encryptedDataBase64 为空', item);
+        throw new Error('加密数据未正确生成，无法下载');
+      }
+
+      if (!ivBase64 || ivBase64.length === 0) {
+        console.error('加密文件下载失败：ivBase64 为空', item);
+        throw new Error('IV未正确生成，无法下载');
+      }
+
       const content = JSON.stringify(
         {
-          data: item.encryptedDataBase64,
-          iv: item.ivBase64,
+          data: encryptedDataBase64,
+          iv: ivBase64,
           fileName: item.fileName,
           fileType: item.fileType,
           algorithm: item.algorithm,
