@@ -1,298 +1,238 @@
-# Vercel 部署指南
+# 🚀 Vercel 部署指南
 
-本指南将帮助你将文件加密工具部署到 Vercel 平台。
+本指南将帮助您在 5 分钟内将应用部署到 Vercel，获得永久免费的访问地址。
 
-## 目录
+## 📋 前置要求
 
-- [前置准备](#前置准备)
-- [部署方式](#部署方式)
-- [环境变量配置](#环境变量配置)
-- [部署后验证](#部署后验证)
-- [常见问题](#常见问题)
+- ✅ 代码已推送到 GitHub（已完成）
+- ✅ Supabase 项目已创建（已完成）
+- ✅ Supabase Storage Bucket 已创建（**需要手动完成**）
 
----
+## 🔧 第一步：创建 Supabase Storage Bucket（必需）
 
-## 前置准备
+在部署到 Vercel 之前，**必须**先在 Supabase 中创建 Storage Bucket。
 
-### 1. GitHub 仓库
-你的代码已经推送到 GitHub：
-```
-https://github.com/LC0225/file-encryptor-with-ticket.git
-```
+### 方式 A：通过 Supabase 控制台创建（推荐）
 
-### 2. Vercel 账号
-- 访问 [vercel.com](https://vercel.com)
-- 使用 GitHub、GitLab 或邮箱注册账号
+1. 访问：https://supabase.com/dashboard/project/wzvpiyjxlaihcjgdchez/storage
+2. 点击 **"New bucket"** 按钮
+3. 填写以下信息：
+   - **Name**: `file-encrypt`（必须完全一致，区分大小写）
+   - **Public bucket**: ❌ 不勾选
+   - **File size limit**: `50 MB`（可根据需要调整）
+4. 点击 **"Create bucket"**
 
-### 3. 项目配置文件
-你的项目已包含以下配置文件：
-- ✅ `vercel.json` - Vercel 部署配置
-- ✅ `package.json` - 依赖和脚本配置
-- ✅ `next.config.ts` - Next.js 配置
+### 方式 B：通过 SQL 创建
 
----
+在 Supabase SQL Editor 中运行：
 
-## 部署方式
-
-### 方式 1：通过 Vercel CLI（适合开发者）
-
-#### 安装 Vercel CLI
-```bash
-npm i -g vercel
+```sql
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('file-encrypt', 'file-encrypt', false, 52428800); -- 50 MB
 ```
 
-#### 登录 Vercel
-```bash
-vercel login
-```
-按照提示选择认证方式（推荐使用 GitHub 登录）
+### 配置 Bucket 权限（推荐）
 
-#### 部署到预览环境
-```bash
-vercel
-```
-首次运行时，Vercel 会引导你配置项目：
-1. 是否链接到现有项目（选择 No）
-2. 设置项目名称和范围
-3. 配置环境变量
+1. 进入刚创建的 `file-encrypt` bucket
+2. 点击 **"Policies"** 标签页
+3. 选择 **"Authenticated Access"** 模板
+4. 点击 **"Use this template"**
 
-#### 部署到生产环境
-```bash
-vercel --prod
-```
+## 🚀 第二步：部署到 Vercel
 
----
+### 1. 登录 Vercel
 
-### 方式 2：通过 GitHub 集成（推荐）
+访问：https://vercel.com/login
 
-#### 步骤 1：导入仓库
-1. 登录 Vercel 控制台
-2. 点击 "Add New Project"
-3. 选择 "Import Git Repository"
-4. 选择 `LC0225/file-encryptor-with-ticket` 仓库
-5. 点击 "Import"
+- 使用 GitHub 账号登录
+- 授权 Vercel 访问您的 GitHub 仓库
 
-#### 步骤 2：配置项目
-Vercel 会自动检测 Next.js 项目：
+### 2. 导入项目
+
+1. 登录后，点击 **"Add New..."** → **"Project"**
+2. 找到并选择 `file-encryptor-with-ticket` 仓库
+3. 点击 **"Import"**
+
+### 3. 配置项目
+
+Vercel 会自动检测到 Next.js 项目，您需要配置以下内容：
+
+#### 框架预设（自动检测）
+
 - **Framework Preset**: Next.js
-- **Root Directory**: `./`（保持默认）
-- **Build Command**: `npm run build`（自动检测）
-- **Output Directory**: `.next`（自动检测）
+- **Root Directory**: `./`（默认）
+- **Build Command**: `yarn build`（默认）
+- **Output Directory**: `.next`（默认）
 
-#### 步骤 3：配置环境变量
-在 "Environment Variables" 部分添加环境变量（见下方）
+#### 环境变量（必需配置）
 
-#### 步骤 4：部署
-点击 "Deploy" 按钮，Vercel 会自动：
-1. 安装依赖（`npm install`）
-2. 构建项目（`npm run build`）
-3. 部署到全球 CDN
+点击 **"Environment Variables"** 部分，添加以下变量：
 
----
+| 变量名 | 值 | 环境 |
+|-------|-----|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://wzvpiyjxlaihcjgdchez.supabase.co` | ✅ Production ✅ Preview ✅ Development |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6dnBpeWp4bGFpaGNqZ2RjaGV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjA1NDQsImV4cCI6MjA4MzQzNjU0NH0.BiDs5jYdHz6gAzIQCKNldden7OsAmQ3PXK-HYyvt4kk` | ✅ Production ✅ Preview ✅ Development |
 
-## 环境变量配置
+**添加步骤**：
+1. 在 **Name** 字段输入变量名（如：`NEXT_PUBLIC_SUPABASE_URL`）
+2. 在 **Value** 字段输入对应的值
+3. 在 **Environment** 列勾选所有三个环境（Production、Preview、Development）
+4. 点击 **"Add"** 按钮
+5. 重复以上步骤，添加第二个变量
 
-### 在 Vercel 项目设置中添加环境变量
+### 4. 部署设置（可选）
 
-#### 路径
-项目设置 → Environment Variables
+在 **"Build & Development Settings"** 中：
 
-#### 必需配置
+- **Build Command**: `yarn build`（已自动设置）
+- **Output Directory**: `.next`（已自动设置）
+- **Install Command**: `yarn install`（已自动设置）
+- **Development Command**: `yarn dev`（已自动设置）
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://wzvpiyjxlaihcjgdchez.supabase.co
-```
+点击 **"Advanced"** 可以看到更多配置，通常不需要修改。
 
-```
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6dnBpeWp4bGFpaGNqZ2RjaGV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NjA1NDQsImV4cCI6MjA4MzQzNjU0NH0.BiDs5jYdHz6gAzIQCKNldden7OsAmQ3PXK-HYyvt4kk
-```
+### 5. 开始部署
 
-#### 可选配置（启用数据库）
+1. 检查所有配置是否正确
+2. 点击右下角的 **"Deploy"** 按钮
+3. 等待部署完成（通常 2-3 分钟）
 
-```
-USE_DATABASE=true
-```
+### 6. 部署成功
 
-```
-DATABASE_URL=postgresql://postgres.8XctZ2JwUUjC0vE9@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres
-```
+部署成功后，您会看到：
+- 🎉 **"Congratulations!"** 页面
+- 🌐 **Production URL**: `https://file-encryptor-with-ticket-xxxx.vercel.app`
+- 📦 自动分配的域名
 
-### 环境变量说明
+**记下这个 URL，这就是您的永久访问地址！**
 
-| 变量名 | 用途 | 必需 | 说明 |
-|-------|------|------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase API 地址 | 是 | 用于云端数据同步 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名访问密钥 | 是 | 用于云端数据访问 |
-| `USE_DATABASE` | 是否使用数据库 | 否 | `true`=使用数据库，`false`=使用localStorage |
-| `DATABASE_URL` | PostgreSQL 连接字符串 | 否 | `USE_DATABASE=true` 时必需 |
+## ✅ 部署后验证
 
-### 环境变量范围选择
+### 1. 测试基本功能
 
-- **Production**: 生产环境（部署到主域名）
-- **Preview**: 预览环境（每次 PR/提交）
-- **Development**: 开发环境（本地开发）
+1. 访问您的 Vercel 应用 URL
+2. 点击"注册账号"创建新用户
+3. 登录并测试加密/解密功能
+4. 检查个人中心的云端同步是否正常
 
-**建议**：所有环境变量都选择 `Production`、`Preview` 和 `Development` 三个环境。
+### 2. 测试云端同步
 
----
+1. 在个人中心点击"从云端同步"
+2. 如果是第一次，会显示"云端暂无数据"
+3. 加密一个文件后，数据会自动上传到云端
+4. 刷新页面或在不同设备登录，数据会自动同步
 
-## 部署后验证
+### 3. 检查 Supabase 数据
 
-### 1. 访问应用
-部署成功后，Vercel 会提供一个域名，例如：
-```
-https://file-encryptor-with-ticket.vercel.app
-```
+1. 访问 Supabase 控制台：https://supabase.com/dashboard/project/wzvpiyjxlaihcjgdchez/storage
+2. 进入 `file-encrypt` bucket
+3. 查看是否生成了 `app-data/users.json` 和 `app-data/user-{userId}-history.json` 文件
 
-### 2. 功能测试清单
+## 🔄 自动部署
 
-#### 基础功能
-- [ ] 访问首页正常
-- [ ] 注册新用户成功
-- [ ] 用户登录成功
-- [ ] 退出登录正常
+配置完成后，每次您推送新代码到 GitHub main 分支时，Vercel 会自动重新部署。
 
-#### 文件加密/解密
-- [ ] 单文件加密成功
-- [ ] 单文件解密成功
-- [ ] 批量加密成功
-- [ ] 批量解密成功
-- [ ] 下载加密文件正常
+### 触发自动部署的步骤：
 
-#### 个人中心
-- [ ] 个人中心访问正常
-- [ ] 加密历史显示正常
-- [ ] 云端同步功能正常
-- [ ] 删除加密历史正常
+1. 在本地修改代码
+2. 提交更改：`git add . && git commit -m "your message"`
+3. 推送到 GitHub：`git push origin main`
+4. Vercel 自动检测到更新并重新部署（2-3 分钟）
 
-#### 管理员功能
-- [ ] 管理员登录成功（账号：root / BGSN123.321）
-- [ ] 用户列表显示正常
-- [ ] 新增用户功能正常
-- [ ] 修改密码功能正常
-- [ ] 删除用户功能正常
-- [ ] 搜索用户功能正常
-
-### 3. 检查日志
-如果遇到问题，可以在 Vercel 控制台查看：
-- **Logs** - 应用运行日志
-- **Build Logs** - 构建日志
-- **Analytics** - 访问分析
-
----
-
-## 常见问题
-
-### Q1: 部署失败，提示构建错误
-
-**可能原因**：
-- 依赖安装失败
-- 环境变量未配置
-
-**解决方案**：
-1. 检查 `Build Logs` 查看详细错误
-2. 确保环境变量已正确配置
-3. 尝试重新部署：点击 "Redeploy" 按钮
-
-### Q2: 云端同步功能不工作
-
-**可能原因**：
-- Supabase 环境变量未配置
-- Supabase 配置错误
-
-**解决方案**：
-1. 检查环境变量是否正确配置
-2. 确认 Supabase 服务正常
-3. 检查浏览器控制台是否有错误
-
-### Q3: 数据库连接失败
-
-**可能原因**：
-- `DATABASE_URL` 配置错误
-- Supabase 数据库未启动
-
-**解决方案**：
-1. 检查 `DATABASE_URL` 格式是否正确
-2. 如果不需要数据库，可以不配置 `USE_DATABASE=true`
-3. 应用会自动回退到 localStorage 模式
-
-### Q4: 管理员账号无法登录
-
-**可能原因**：
-- 生产环境未初始化管理员账号
-- 数据库状态不一致
-
-**解决方案**：
-1. 访问 `/api/auth/init-admin` 初始化管理员账号
-2. 或者在本地环境中先注册管理员账号
-
-### Q5: 如何自定义域名？
-
-**步骤**：
-1. 在项目设置 → Domains
-2. 点击 "Add Domain"
-3. 输入你的域名（如 `encrypt.yourdomain.com`）
-4. 按照提示配置 DNS 记录
-5. 等待 SSL 证书生成（自动）
-
-### Q6: 如何更新应用？
-
-**方式 1：自动部署**
-- 推送代码到 GitHub
-- Vercel 自动检测并部署
-
-**方式 2：手动部署**
-- 在 Vercel 控制台点击 "Redeploy"
-- 或使用 CLI：`vercel --prod`
-
----
-
-## 性能优化建议
-
-### 1. 启用图片优化
-`next.config.ts` 已配置 `images.unoptimized: true`，如需优化可调整。
-
-### 2. 启用 CDN
-Vercel 默认使用全球 CDN，无需额外配置。
-
-### 3. 缓存策略
-应用已使用 Next.js 静态生成和缓存策略，无需额外配置。
-
----
-
-## 安全建议
+## 🛡️ 安全建议
 
 ### 1. 保护环境变量
-- 不要将 `.env.local` 提交到 Git（已在 `.gitignore` 中）
-- 不要在代码中硬编码敏感信息
 
-### 2. HTTPS
-Vercel 默认启用 HTTPS，无需额外配置。
+- ✅ 环境变量只在服务器端可用
+- ✅ 前端无法读取敏感信息
+- ✅ 不要在代码中硬编码密钥
 
-### 3. Supabase 安全
-- 使用匿名访问密钥（anon key）而非服务密钥（service key）
-- 定期更换 Supabase API 密钥
+### 2. 定期更新
 
----
+- 保持依赖包最新：`yarn upgrade`
+- 检查安全漏洞：`yarn audit`
 
-## 技术支持
+### 3. 监控使用情况
 
-### Vercel 文档
-- [Vercel 官方文档](https://vercel.com/docs)
-- [Next.js 部署指南](https://vercel.com/docs/frameworks/nextjs)
+在 Vercel Dashboard 中可以查看：
+- 访问量统计
+- 性能指标
+- 错误日志
 
-### 项目文档
-- [README.md](./README.md) - 项目总览
-- [ADMIN_USER_MANAGEMENT.md](./ADMIN_USER_MANAGEMENT.md) - 管理员功能文档
+## 📊 Vercel 免费额度
 
----
+Vercel 免费计划包含：
 
-## 部署完成后
+- ✅ 无限项目
+- ✅ 每月 100GB 带宽
+- ✅ 每月 6,000 分钟构建时间
+- ✅ 自动 HTTPS
+- ✅ 全球 CDN
+- ✅ 自动部署
 
-1. **分享应用**：将 Vercel 提供的域名分享给用户
-2. **监控性能**：在 Vercel 控制台查看访问统计和性能指标
-3. **定期更新**：保持依赖和 Next.js 版本最新
+对于个人项目和小型应用，完全免费！
 
----
+## 🆚 本地开发 vs 生产环境
 
-祝你部署顺利！🚀
+| 特性 | 本地开发 | Vercel 生产 |
+|-----|---------|------------|
+| 访问地址 | http://localhost:5000 | https://your-app.vercel.app |
+| 数据同步 | 需要手动启动 | 永久在线 |
+| HTTPS | ❌ 不支持 | ✅ 自动支持 |
+| 全球访问 | ❌ 仅本地 | ✅ 全球可访问 |
+| 自动部署 | ❌ 手动 | ✅ 自动 |
+| 监控 | ❌ 无 | ✅ 完整监控 |
+
+## 🐛 常见问题
+
+### Q1: 部署失败，提示"Build Error"
+
+**原因**：依赖安装失败或构建错误
+
+**解决方案**：
+1. 检查 Vercel 构建日志
+2. 确保 `package.json` 中的依赖正确
+3. 本地运行 `yarn build` 测试
+
+### Q2: 云端同步不工作
+
+**原因**：Supabase Bucket 未创建或环境变量配置错误
+
+**解决方案**：
+1. 检查是否创建了 `file-encrypt` bucket
+2. 检查 Vercel 环境变量是否正确配置
+3. 检查 Bucket 权限设置
+
+### Q3: 部署成功但访问报错
+
+**原因**：环境变量未生效
+
+**解决方案**：
+1. 在 Vercel Dashboard 进入项目设置
+2. 重新输入环境变量
+3. 触发重新部署
+
+### Q4: 如何自定义域名？
+
+**解决方案**：
+1. 在 Vercel Dashboard 进入项目
+2. 点击 **Settings** → **Domains**
+3. 添加您的域名并配置 DNS
+
+## 📞 获取帮助
+
+- **Vercel 文档**: https://vercel.com/docs
+- **Next.js 文档**: https://nextjs.org/docs
+- **Supabase 文档**: https://supabase.com/docs
+- **GitHub Issues**: https://github.com/LC0225/file-encryptor-with-ticket/issues
+
+## 🎉 完成！
+
+恭喜您成功部署到 Vercel！现在您拥有一个永久在线的文件加密应用，可以随时随地访问使用。
+
+**保存好以下信息**：
+- 🌐 应用地址：`https://file-encryptor-with-ticket-xxxx.vercel.app`
+- 🔑 Supabase 项目：https://supabase.com/dashboard/project/wzvpiyjxlaihcjgdchez
+- 📦 Storage Bucket：`file-encrypt`
+
+祝您使用愉快！🚀
