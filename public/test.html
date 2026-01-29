@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文件加密工具 - 测试页面</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      max-width: 400px;
+      text-align: center;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+    }
+    p {
+      color: #666;
+      line-height: 1.6;
+    }
+    .success {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .timestamp {
+      color: #999;
+      font-size: 0.875rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎉 测试成功！</h1>
+    <p>这是一个纯静态 HTML 测试页面。</p>
+    <p class="success">✅ 服务器运行正常</p>
+    <p>如果您能看到这个页面，说明：</p>
+    <ul style="text-align: left; color: #666;">
+      <li>Vercel 部署成功</li>
+      <li>网络连接正常</li>
+      <li>域名解析正确</li>
+    </ul>
+    <p class="timestamp" id="time"></p>
+  </div>
+  <script>
+    document.getElementById('time').textContent = '加载时间：' + new Date().toLocaleString('zh-CN');
+  </script>
+</body>
+</html>
