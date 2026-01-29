@@ -17,19 +17,28 @@ export default function Login() {
     setError('');
     setLoading(true);
 
+    console.log('🚀 [Login Page] 开始提交登录表单');
+
     try {
       // 初始化管理员账号
+      console.log('🔧 [Login Page] 初始化管理员账号...');
       await initAdminUser();
+      console.log('✅ [Login Page] 管理员账号初始化完成');
 
       // 登录
+      console.log('🔐 [Login Page] 调用 loginUser...');
       const result = await loginUser(username, password);
-      
+      console.log('📊 [Login Page] 登录结果:', result);
+
       if (result.success) {
+        console.log('✅ [Login Page] 登录成功，跳转到主页');
         router.push('/');
       } else {
+        console.log('❌ [Login Page] 登录失败:', result.message);
         setError(result.message);
       }
     } catch (err) {
+      console.error('💥 [Login Page] 登录过程中发生异常:', err);
       setError('登录失败，请重试');
     } finally {
       setLoading(false);
