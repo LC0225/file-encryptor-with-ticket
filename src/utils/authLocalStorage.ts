@@ -38,9 +38,36 @@ function arrayBufferToHex(buffer: ArrayBuffer): string {
 }
 
 /**
+ * 检查 crypto.subtle 是否可用
+ */
+function isCryptoSubtleAvailable(): boolean {
+  return typeof crypto !== 'undefined' && crypto.subtle !== undefined;
+}
+
+/**
+ * 备用密码哈希函数（当 crypto.subtle 不可用时使用）
+ * 注意：这不是安全的哈希函数，仅作为备用方案
+ * 在生产环境中，应该升级浏览器或使用 HTTPS
+ */
+function fallbackHashPassword(password: string): string {
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16) + '_fallback';
+}
+
+/**
  * 密码加密（使用SHA-256）
  */
 async function hashPassword(password: string): Promise<string> {
+  if (!isCryptoSubtleAvailable()) {
+    console.warn('⚠️ crypto.subtle 不可用，使用备用哈希函数');
+    return fallbackHashPassword(password);
+  }
+
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hash = await crypto.subtle.digest('SHA-256', data);
@@ -59,12 +86,19 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
  * 获取所有用户
  */
 function getUsers(): UserType[] {
-  if (typeof window === 'undefined') return [];
+  if (typeof window === 'undefined') {
+    console.log('⚠️ [getUsers] 服务端环境，返回空数组');
+    return [];
+  }
+
   try {
     const data = localStorage.getItem(USERS_KEY);
-    return data ? JSON.parse(data) : [];
+    console.log('📦 [getUsers] localStorage 数据:', data ? data.substring(0, 100) + '...' : 'null');
+    const users = data ? JSON.parse(data) : [];
+    console.log('👥 [getUsers] 解析后的用户数量:', users.length);
+    return users;
   } catch (error) {
-    console.error('读取用户数据失败:', error);
+    console.error('❌ [getUsers] 读取用户数据失败:', error);
     return [];
   }
 }
@@ -85,12 +119,17 @@ function saveUsers(users: UserType[]): void {
  * 初始化管理员账号
  */
 export async function initAdminUser(): Promise<void> {
+  console.log('🔍 [initAdminUser] crypto.subtle 可用性:', isCryptoSubtleAvailable());
+
   const users = getUsers();
+  console.log('👥 [initAdminUser] 当前用户数量:', users.length);
 
   // 查找是否已存在 root 用户
   const existingAdmin = users.find(u => u.username === 'root');
 
   if (existingAdmin) {
+    console.log('✅ [initAdminUser] 管理员账号已存在，检查 role 字段...');
+
     // 确保 root 用户有正确的 role 字段
     let needsUpdate = false;
 
@@ -119,6 +158,7 @@ export async function initAdminUser(): Promise<void> {
     }
   } else {
     // 创建新的管理员账号
+    console.log('🆕 [initAdminUser] 创建新的管理员账号');
     const admin: UserType = {
       id: 'admin_' + Date.now(),
       username: 'root',
