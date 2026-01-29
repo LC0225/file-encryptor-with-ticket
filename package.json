@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "export": "next build && next export"
+    "export": "next build && next export",
+    "install:all": "yarn install",
+    "deploy": "yarn install && yarn dev"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",
