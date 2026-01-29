@@ -16,30 +16,31 @@ if %ERRORLEVEL% NEQ 0 (
 echo OK: Node.js is installed
 node --version
 
-REM Check Yarn
+REM Install dependencies using npm
 echo.
-echo [2/5] Checking Yarn...
-where yarn >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo WARNING: Yarn is not installed, installing now...
-    call npm install -g yarn
-)
-echo OK: Yarn is ready
-
-REM Install dependencies
-echo.
-echo [3/5] Installing project dependencies...
-yarn install
+echo [2/5] Installing project dependencies...
+npm install
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Dependency installation failed
-    pause
-    exit /b 1
+    echo Trying with yarn as fallback...
+    where yarn >nul 2>&1
+    if %ERRORLEVEL% NEQ 0 (
+        echo ERROR: Neither npm nor yarn is available
+        pause
+        exit /b 1
+    )
+    yarn install
+    if %ERRORLEVEL% NEQ 0 (
+        echo ERROR: Dependency installation failed
+        pause
+        exit /b 1
+    )
 )
 echo OK: Dependencies installed
 
 REM Create environment file
 echo.
-echo [4/5] Setting up environment variables...
+echo [3/5] Setting up environment variables...
 if not exist .env.local (
     echo Creating .env.local file...
     copy .env.example .env.local >nul
@@ -51,7 +52,7 @@ if not exist .env.local (
 
 REM Start development server
 echo.
-echo [5/5] Starting development server...
+echo [4/5] Starting development server...
 echo.
 echo ========================================
 echo   Deployment Complete!
@@ -66,6 +67,6 @@ echo.
 echo Starting server...
 echo.
 
-yarn dev
+npm run dev
 
 pause
