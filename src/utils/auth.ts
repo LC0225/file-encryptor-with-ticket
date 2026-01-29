@@ -31,31 +31,11 @@ export function validatePassword(password: string): { valid: boolean; message: s
  * 初始化管理员账号
  */
 export async function initAdminUser(): Promise<void> {
-  if (canUseDatabase()) {
-    try {
-      const response = await fetch('/api/auth/init-admin', {
-        method: 'POST',
-        // 设置超时，避免长时间阻塞
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!response.ok) {
-        // 如果 API 返回错误（比如 503），回退到 localStorage
-        console.warn(`初始化管理员账号失败: ${response.status} ${response.statusText}`);
-        await authLocalStorage.initAdminUser();
-        return;
-      }
-
-      const data = await response.json();
-      console.log(data.message);
-    } catch (error) {
-      console.error('初始化管理员账号失败:', error);
-      // 如果数据库失败，回退到localStorage
-      await authLocalStorage.initAdminUser();
-    }
-  } else {
-    await authLocalStorage.initAdminUser();
-  }
+  // 直接使用 localStorage 模式，不尝试访问数据库
+  // 这样可以避免数据库未配置时的错误
+  console.log('📝 初始化管理员账号（localStorage 模式）');
+  await authLocalStorage.initAdminUser();
+  console.log('✅ 管理员账号初始化完成');
 }
 
 /**
