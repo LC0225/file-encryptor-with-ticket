@@ -13,6 +13,24 @@ export function canUseDatabase(): boolean {
     return true;
   }
 
+  // 如果显式禁用了数据库，则不使用
+  if (process.env.USE_DATABASE === 'false') {
+    return false;
+  }
+
+  // 检查是否配置了数据库 URL
+  const hasDatabaseConfig = !!(
+    process.env.DATABASE_URL ||
+    process.env.PGDATABASE_URL ||
+    process.env.NEXT_PUBLIC_DATABASE_URL
+  );
+
+  // 如果没有配置数据库 URL，强制使用 localStorage 模式
+  if (!hasDatabaseConfig) {
+    console.warn('数据库未配置，将使用 localStorage 模式。如需使用数据库，请设置 DATABASE_URL 环境变量。');
+    return false;
+  }
+
   // 默认在开发环境使用数据库，生产环境使用localStorage
   return isDevelopment;
 }
