@@ -75,18 +75,19 @@ export async function loginUser(
   username: string,
   password: string
 ): Promise<{ success: boolean; message: string; user?: User }> {
-  // 首先尝试 localStorage 登录（优先级更高，因为更可靠）
-  try {
-    const result = await authLocalStorage.loginUser(username, password);
-    if (result.success) {
-      console.log('✅ 通过 localStorage 登录成功:', result.user?.username);
-      return result;
-    }
-  } catch (error) {
-    console.log('⚠️ localStorage 登录失败，尝试 API 登录');
+  console.log('🔐 开始登录流程，用户名:', username);
+
+  // 优先使用 localStorage 登录（更可靠，不依赖数据库）
+  const result = await authLocalStorage.loginUser(username, password);
+
+  if (result.success) {
+    console.log('✅ 通过 localStorage 登录成功:', result.user?.username);
+    return result;
   }
 
-  // 如果 localStorage 登录失败（或用户不存在），尝试 API 登录
+  console.log('⚠️ localStorage 登录失败:', result.message);
+
+  // 如果 localStorage 登录失败，尝试 API 登录（仅当数据库可用时）
   if (canUseDatabase()) {
     try {
       const response = await fetch('/api/auth/login', {
